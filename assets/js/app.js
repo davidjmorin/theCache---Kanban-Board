@@ -162,7 +162,6 @@ class KanbanApp {
                 this.currentUser = response.user;
                 this.showApp();
                 await this.loadBoardData();
-                this.renderBoard();
                 this.checkDueTasks();
                 this.applyTheme();
             } else {
@@ -196,6 +195,7 @@ class KanbanApp {
         const formData = new FormData(e.target);
 
         try {
+            this.showLoading();
             const response = await this.apiCall('login', 'POST', {
                 email: formData.get('email'),
                 password: formData.get('password')
@@ -204,11 +204,12 @@ class KanbanApp {
             this.currentUser = response.user;
             this.showApp();
             await this.loadBoardData();
-            this.renderBoard();
             this.checkDueTasks();
             this.showNotification('Login successful!', 'success');
         } catch (error) {
             this.showNotification('Login failed: ' + error.message, 'error');
+        } finally {
+            this.hideLoading();
         }
     }
 
@@ -217,6 +218,7 @@ class KanbanApp {
         const formData = new FormData(e.target);
 
         try {
+            this.showLoading();
             const response = await this.apiCall('register', 'POST', {
                 name: formData.get('name'),
                 email: formData.get('email'),
@@ -226,11 +228,12 @@ class KanbanApp {
             this.currentUser = response.user;
             this.showApp();
             await this.loadBoardData();
-            this.renderBoard();
             this.checkDueTasks();
             this.showNotification('Registration successful!', 'success');
         } catch (error) {
             this.showNotification('Registration failed: ' + error.message, 'error');
+        } finally {
+            this.hideLoading();
         }
     }
 
@@ -266,6 +269,7 @@ class KanbanApp {
 
     async loadBoardData() {
         try {
+            console.log('Starting loadBoardData...');
             this.showLoading();
 
             if (!this.data.currentBoard) {
@@ -282,22 +286,40 @@ class KanbanApp {
                 this.data.clients = [];
 
                 if (this.data.boards.length > 0) {
+                    // Try to load the last board the user was on
                     const savedBoardId = localStorage.getItem('kanban-current-board');
                     if (savedBoardId) {
                         const savedBoard = this.data.boards.find(b => b.id == parseInt(savedBoardId));
                         if (savedBoard) {
                             this.data.currentBoard = savedBoard;
+                            console.log('Loaded saved board:', savedBoard.name);
+                        } else {
+                            console.log('Saved board not found, will use default');
                         }
                     }
 
-                    if (!this.data.currentBoard && this.data.boards.length > 0) {
+                    // If no saved board or saved board doesn't exist, use the first board
+                    if (!this.data.currentBoard) {
                         this.data.currentBoard = this.data.boards[0];
                         this.saveBoardSelection(this.data.currentBoard.id);
+                        console.log('Using default board:', this.data.currentBoard.name);
                     }
+                } else {
+                    // No boards exist - this shouldn't happen in normal usage
+                    console.warn('No boards found');
+                    this.showNotification('No boards available. Please create a board first.', 'warning');
                 }
 
                 this.populateBoardSelector();
-                this.renderBoard();
+                
+                // If we have a current board, load its data
+                if (this.data.currentBoard) {
+                    console.log('Loading data for current board:', this.data.currentBoard.name);
+                    await this.loadCurrentBoardData();
+                } else {
+                    console.log('No current board, rendering empty board');
+                    this.renderBoard();
+                }
                 return;
             }
 
@@ -321,11 +343,43 @@ class KanbanApp {
             this.renderBoard();
             this.populateSelectOptions();
             this.checkDueTasks();
+            console.log('Completed loadBoardData for existing board');
         } catch (error) {
             console.error('Error loading board data:', error);
             this.showNotification('Error loading board data', 'error');
         } finally {
             this.hideLoading();
+        }
+    }
+
+    async loadCurrentBoardData() {
+        try {
+            const [boardData, usersData, clientsData] = await Promise.all([
+                this.apiCall('board', 'GET', null, { board_id: this.data.currentBoard.id }),
+                this.apiCall('users'),
+                this.apiCall('clients')
+            ]);
+
+            this.data.board = boardData.board;
+            this.data.stages = boardData.stages || [];
+            this.data.tasks = boardData.tasks || [];
+            this.data.users = usersData || [];
+            this.data.clients = clientsData || [];
+
+            this.renderBoard();
+            this.populateSelectOptions();
+            this.checkDueTasks();
+            
+            // Update the company name to show the current board
+            const companyNameElement = document.getElementById('companyName');
+            if (companyNameElement && this.data.currentBoard) {
+                companyNameElement.textContent = this.data.currentBoard.name;
+            }
+            
+            console.log('Loaded board data for:', this.data.currentBoard.name);
+        } catch (error) {
+            console.error('Error loading current board data:', error);
+            this.showNotification('Error loading board data', 'error');
         }
     }
 
@@ -3120,6 +3174,11 @@ class KanbanApp {
         const boardSelect = document.getElementById('boardSelector');
         const mobileBoardSelect = document.getElementById('mobileBoardSelector');
 
+        if (!boardSelect || !mobileBoardSelect) {
+            console.warn('Board selectors not found');
+            return;
+        }
+
         boardSelect.innerHTML = '<option value="">Select Board</option>';
         mobileBoardSelect.innerHTML = '<option value="">Select Board</option>';
 
@@ -3138,6 +3197,9 @@ class KanbanApp {
         if (this.data.currentBoard) {
             boardSelect.value = this.data.currentBoard.id;
             mobileBoardSelect.value = this.data.currentBoard.id;
+            console.log('Set board selector to:', this.data.currentBoard.name);
+        } else {
+            console.log('No current board to set in selector');
         }
     }
 
@@ -3159,12 +3221,14 @@ class KanbanApp {
         this.saveBoardSelection(board.id);
         this.populateBoardSelector();
 
+        // Update the company name to show the current board
         const companyNameElement = document.getElementById('companyName');
         if (companyNameElement) {
             companyNameElement.textContent = board.name;
         }
 
-        await this.loadBoardData();
+        console.log('Switched to board:', board.name);
+        await this.loadCurrentBoardData();
     }
 
     showBoardsModal() {
