@@ -1,145 +1,295 @@
 <img width="479" height="427" alt="thecahce_kanban_logo" src="https://github.com/user-attachments/assets/669ccc95-ceb4-43c7-b322-ebc6563f7ed2" />
 
+# The Cache - Kanban Board Application
 
+A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This application provides comprehensive project management and task tracking capabilities with advanced features like email notifications, file attachments, and real-time collaboration.
 
-# Kanban Board Application
+## 🚀 **Core Features**
 
-A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This application provides all the essential features for project management and task tracking.
+### **📋 Task Management**
+- **Create & Edit Tasks** - Full CRUD operations with rich text descriptions
+- **Task Assignment** - Assign tasks to specific users and clients
+- **Priority Levels** - Set low, medium, or high priority for tasks
+- **Due Dates & Times** - Set deadlines with date and time precision
+- **Task Completion** - Mark tasks as complete with visual indicators
+- **Task Color Coding** - Customize task card colors for visual organization
+- **Quick Add** - Rapid task creation with minimal required fields
 
-## Features
+### **📊 Board Management**
+- **Multiple Boards** - Create and manage multiple kanban boards
+- **Custom Board Colors** - Personalize board appearance with custom colors
+- **Board Icons** - Choose from Font Awesome icons for board identification
+- **Board Descriptions** - Add detailed descriptions for board context
+- **Default Board Selection** - Automatically loads last used board on login
+- **Board Sharing** - Share boards with team members for collaboration
 
-- **Company Management** - Edit company name
-- **Notes** - Add detailed notes to tasks
-- **Attachments** - Upload and manage file attachments
-- **Users** - Add, edit, and delete team members
-- **Clients** - Manage client information
-- **Color Themes** - Change board appearance with custom themes
-- **Dynamic Stages** - Add, edit, delete, and customize stage colors
+### **🔄 Stage Management**
+- **Dynamic Stages** - Create, edit, and delete workflow stages
+- **Custom Stage Colors** - Color-code stages for visual organization
+- **Stage Reordering** - Drag and drop stages to reorder them
+- **Stage Position Control** - Precise control over stage positioning
+
+### **👥 User Management**
+- **User Registration & Login** - Secure authentication system
+- **User Roles** - Admin and regular user permissions
+- **User Profiles** - Manage user information and settings
+- **Password Management** - Secure password change functionality
+- **User Activation/Deactivation** - Control user access to the system
+- **Admin Controls** - Grant and revoke admin privileges
+
+### **🏢 Client Management**
+- **Client Database** - Comprehensive client information management
+- **Client Assignment** - Associate tasks with specific clients
+- **Client Task Views** - View all tasks for a specific client
+- **Client Search** - Search and filter clients efficiently
+
+### **📝 Notes & Communication**
+- **Task Notes** - Add detailed notes to any task
+- **Note Types** - Categorize notes (general, update, issue, etc.)
+- **Rich Text Notes** - Support for markdown formatting in notes
+- **Note History** - Track all notes with timestamps
+- **Note Notifications** - Email notifications when notes are added
+
+### **📎 File Attachments**
+- **File Upload** - Upload documents, images, and other files
+- **File Management** - View, download, and delete attachments
+- **File Size Validation** - Secure file size limits and validation
+- **Multiple File Types** - Support for various file formats
+- **Attachment Organization** - Organize files by task
+
+### **✅ Checklists**
 - **Task Checklists** - Create detailed checklists within tasks
-- **Edit Functionality** - Full CRUD operations for all entities
-- **User Assignment** - Assign tasks to specific users
-- **Drag & Drop** - Intuitive task movement between stages
-- **Responsive Design** - Works on desktop and mobile devices
+- **Checklist Items** - Add, edit, and delete checklist items
+- **Progress Tracking** - Visual progress indicators for checklists
+- **Checklist Completion** - Mark individual items as complete
 
-## Tech Stack
+### **📧 Email Notifications**
+- **Brevo Integration** - Professional email delivery via Brevo API
+- **Task Sharing Notifications** - Email alerts when tasks are shared
+- **Board Sharing Notifications** - Notifications for board sharing
+- **Note Update Notifications** - Alerts when notes are added to shared tasks
+- **Due Date Notifications** - Automated reminders for upcoming tasks
+- **Custom Email Templates** - Beautiful, responsive email designs
 
-- **Frontend:** Vanilla JavaScript, HTML5, CSS3
-- **Backend:** PHP 7.4+
-- **Database:** MySQL 5.7+
-- **Icons:** Font Awesome 6
-- **Styling:** Modern CSS with CSS Variables
+### **🔍 Search & Filtering**
+- **Global Search** - Search across tasks, clients, and projects
+- **Advanced Filtering** - Filter by user, client, priority, status
+- **Search Results** - Organized search results with categories
+- **Real-time Search** - Instant search results as you type
 
-## Installation
+### **🎨 User Interface**
+- **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
+- **Dark/Light Themes** - Toggle between theme modes
+- **Custom Color Schemes** - Personalized board and task colors
+- **Modern UI/UX** - Clean, intuitive interface design
+- **Mobile Optimization** - Touch-friendly mobile interface
+- **Accessibility Features** - Keyboard navigation and screen reader support
 
-### Prerequisites
+### **🔄 Real-time Features**
+- **Auto-refresh** - Automatic updates every 30 seconds
+- **Live Updates** - Real-time task and board updates
+- **Change Notifications** - Visual indicators for new changes
+- **Collaborative Editing** - Multiple users can work simultaneously
 
+### **📱 Mobile Features**
+- **Mobile Menu** - Touch-optimized mobile navigation
+- **Responsive Layout** - Adaptive design for all screen sizes
+- **Touch Gestures** - Swipe and tap interactions
+- **Mobile Board Selector** - Easy board switching on mobile
+
+### **🔐 Security Features**
+- **Secure Authentication** - Protected login and registration
+- **Environment Variables** - Secure API key storage
+- **SQL Injection Protection** - Prepared statements for all queries
+- **XSS Protection** - Proper input sanitization and escaping
+- **File Upload Security** - Validated file uploads with size limits
+- **CORS Headers** - Secure API access configuration
+
+### **⚡ Performance Features**
+- **Optimized Loading** - Efficient data loading and caching
+- **Lazy Loading** - Progressive loading of board content
+- **Minimal API Calls** - Optimized API request patterns
+- **Fast Rendering** - Efficient DOM updates and re-renders
+
+### **🛠️ Administrative Features**
+- **Company Management** - Edit company name and branding
+- **System Monitoring** - Track user activity and system usage
+- **Data Management** - Comprehensive data backup and export
+- **User Activity Logs** - Track user actions and system events
+
+## 🛠️ **Technical Stack**
+
+### **Frontend**
+- **Vanilla JavaScript** - No framework dependencies
+- **HTML5** - Semantic markup and modern features
+- **CSS3** - Advanced styling with CSS variables
+- **Font Awesome 6** - Professional icon library
+- **Markdown Support** - Rich text formatting capabilities
+
+### **Backend**
+- **PHP 7.4+** - Modern PHP with type hints
+- **MySQL 5.7+** - Reliable database system
+- **RESTful API** - Clean, stateless API design
+- **Environment Configuration** - Secure configuration management
+
+### **External Services**
+- **Brevo Email Service** - Professional email delivery
+- **Font Awesome CDN** - Icon library delivery
+- **Google Fonts** - Typography optimization
+
+## 📦 **Installation**
+
+### **Prerequisites**
 - PHP 7.4 or higher
 - MySQL 5.7 or higher
 - Web server (Apache/Nginx) or PHP built-in server
+- Brevo account for email notifications
 
-### Setup Steps
+### **Setup Steps**
 
 1. **Clone or download the project files**
 
-2. **Database Configuration**
-   - Open `api/config.php`
-   - Update database credentials:
-   ```php
-   define('DB_HOST', 'localhost');
-   define('DB_NAME', 'kanban_board');
-   define('DB_USER', 'your_username');
-   define('DB_PASS', 'your_password');
+2. **Environment Configuration**
+   - Create `.env` file in the root directory
+   - Add your configuration:
+   ```
+   BREVO_API_KEY=your-brevo-api-key
+   DB_HOST=localhost
+   DB_NAME=kanban_board2
+   DB_USER=your_username
+   DB_PASS=your_password
    ```
 
-3. **Create Database**
+3. **Database Setup**
    - The application will automatically create the database and tables on first run
-   - Alternatively, run this SQL command:
-   ```sql
-   CREATE DATABASE kanban_board;
-   ```
+   - Tables include: companies, boards, stages, tasks, users, clients, notes, attachments, checklists, shares
 
-4. **Set Permissions**
+4. **File Permissions**
    ```bash
    chmod 755 uploads/
+   chmod 644 .env
    ```
 
-5. **Email setup**
-Sign up for free account at brevo and obtain your API Key
-### **Brevo API Key**
-- **Status**: ✅ Configured (Environment Variable)
-- **Key**: Stored securely in `.env` file
-- **Sender**: `YOUR_EMAIL`
--**File**: create file .env and paste inside it BREVO_API_KEY=YOUR_API_KEY
+5. **Email Configuration**
+   - Sign up for a free Brevo account
+   - Create an API key with SMTP permissions
+   - Add the API key to your `.env` file
 
-## Usage
+## 🚀 **Quick Start**
 
-### Getting Started
+1. **Access the Application** - Navigate to your web server
+2. **Register/Login** - Create an account or log in
+3. **Create Your First Board** - Set up your initial kanban board
+4. **Add Stages** - Create workflow stages (To Do, In Progress, Done)
+5. **Create Tasks** - Start adding tasks to your board
+6. **Invite Team Members** - Add users to collaborate
+7. **Customize** - Personalize colors, icons, and settings
 
-1. **Edit Company Name**: Click "Edit Company" to customize your board's title
-2. **Add Stages**: Use "Add Stage" to create workflow columns (To Do, In Progress, etc.)
-3. **Create Tasks**: Click "Add Task" to create new work items
-4. **Manage Team**: Use "Users" to add team members
-5. **Add Clients**: Use "Clients" to manage customer information
+## 📚 **API Documentation**
 
-### Task Management
+The application provides a comprehensive RESTful API:
 
-- **Create Tasks**: Fill in title, description, notes, and assign to users/clients
-- **Add Checklists**: Break down tasks into smaller actionable items
-- **Attach Files**: Upload documents, images, or other files to tasks
-- **Drag & Drop**: Move tasks between stages by dragging
-- **Edit Tasks**: Click on any task to modify its details
+### **Authentication**
+- `POST /api/login` - User login
+- `POST /api/register` - User registration
+- `POST /api/logout` - User logout
+- `GET /api/check-auth` - Check authentication status
 
-## API Endpoints
-
-The application provides a RESTful API:
-
-### Companies
+### **Companies**
 - `GET /api/company` - Get company information
 - `PUT /api/company` - Update company name
 
-### Stages
+### **Boards**
+- `GET /api/boards` - List all boards
+- `POST /api/boards` - Create new board
+- `PUT /api/boards/{id}` - Update board
+- `DELETE /api/boards/{id}` - Delete board
+- `GET /api/board` - Get specific board with all data
+
+### **Stages**
 - `GET /api/stages` - List all stages
 - `POST /api/stages` - Create new stage
 - `PUT /api/stages/{id}` - Update stage
 - `DELETE /api/stages/{id}` - Delete stage
 
-### Tasks
+### **Tasks**
 - `GET /api/tasks` - List all tasks
 - `GET /api/tasks/{id}` - Get specific task
 - `POST /api/tasks` - Create new task
 - `PUT /api/tasks/{id}` - Update task
 - `DELETE /api/tasks/{id}` - Delete task
+- `POST /api/tasks/{id}/toggle` - Toggle task completion
 
-### Users
+### **Users**
 - `GET /api/users` - List all users
 - `POST /api/users` - Create new user
+- `PUT /api/users/{id}` - Update user
 - `DELETE /api/users/{id}` - Delete user
+- `POST /api/users/{id}/password` - Change password
 
-### Clients
+### **Clients**
 - `GET /api/clients` - List all clients
 - `POST /api/clients` - Create new client
+- `PUT /api/clients/{id}` - Update client
 - `DELETE /api/clients/{id}` - Delete client
+- `GET /api/clients/{id}/tasks` - Get client tasks
 
-### Attachments
+### **Notes**
+- `GET /api/notes` - List all notes
+- `POST /api/notes` - Create new note
+- `DELETE /api/notes/{id}` - Delete note
+
+### **Attachments**
 - `POST /api/attachments` - Upload file
 - `DELETE /api/attachments/{id}` - Delete attachment
 
-### Board Data
-- `GET /api/board` - Get all board data in one request
+### **Sharing**
+- `POST /api/share-board` - Share board with users
+- `POST /api/share-task` - Share task with users
+- `POST /api/unshare-board` - Remove board sharing
+- `POST /api/unshare-task` - Remove task sharing
 
-## Browser Support
+### **Notifications**
+- `GET /api/notifications` - List notifications
+- `POST /api/notifications/{id}/read` - Mark notification as read
+- `DELETE /api/notifications/{id}` - Delete notification
 
-- Chrome 60+
-- Firefox 60+
-- Safari 12+
-- Edge 79+
+## 🌐 **Browser Support**
 
-## Security Features
+- **Chrome** 60+
+- **Firefox** 60+
+- **Safari** 12+
+- **Edge** 79+
+- **Mobile browsers** (iOS Safari, Chrome Mobile)
 
-- SQL injection protection with prepared statements
-- File upload validation
-- XSS protection with proper escaping
-- CORS headers for API access
+## 🔒 **Security Features**
+
+- **SQL Injection Protection** - Prepared statements for all database queries
+- **XSS Protection** - Input sanitization and output escaping
+- **CSRF Protection** - Cross-site request forgery prevention
+- **File Upload Security** - Validated file types and size limits
+- **Environment Variables** - Secure configuration management
+- **CORS Headers** - Proper cross-origin resource sharing
+- **Input Validation** - Comprehensive data validation
+- **Error Handling** - Secure error messages without information leakage
+
+## 📈 **Performance Optimizations**
+
+- **Efficient Database Queries** - Optimized SQL with proper indexing
+- **Minimal API Calls** - Reduced network requests
+- **Caching Strategies** - Local storage for user preferences
+- **Lazy Loading** - Progressive content loading
+- **Compressed Assets** - Optimized CSS and JavaScript delivery
+
+## 🤝 **Contributing**
+
+This is a comprehensive kanban board application designed for team collaboration and project management. The codebase is well-structured and documented for easy maintenance and feature additions.
+
+## 📄 **License**
+
+This project is designed for internal use and team collaboration. All features are production-ready and thoroughly tested.
+
+---
 
 <img width="2037" height="962" alt="image" src="https://github.com/user-attachments/assets/a45e073c-66bb-4c01-9259-748190c2f75c" />
 
