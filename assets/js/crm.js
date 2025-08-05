@@ -1,4 +1,3 @@
-// CRM JavaScript functionality
 class CRMApp {
     constructor() {
         this.apiBase = 'api.php?endpoint=';
@@ -24,7 +23,7 @@ class CRMApp {
             }
         } catch (error) {
             console.error('Auth check failed:', error);
-            // Check if it's an authentication error
+
             if (error.message.includes('Authentication required') || error.message.includes('401')) {
             window.location.href = 'index.html';
             } else {
@@ -49,20 +48,18 @@ class CRMApp {
             const url = this.apiBase + endpoint;
             const response = await fetch(url, options);
 
-            // Check if response is ok before trying to parse JSON
             if (!response.ok) {
                 let errorMessage = 'API request failed';
                 try {
                     const errorResult = await response.json();
                     errorMessage = errorResult.error || errorMessage;
                 } catch (jsonError) {
-                    // If JSON parsing fails, use the status text
+
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
             }
 
-            // Only try to parse JSON if response is ok
             const result = await response.json();
             return result;
         } catch (error) {
@@ -84,7 +81,7 @@ class CRMApp {
 
     renderClientTable() {
         const container = document.getElementById('clientTableContainer');
-        
+
         if (this.clients.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -113,7 +110,7 @@ class CRMApp {
                 </tbody>
             </table>
         `;
-        
+
         container.innerHTML = table;
     }
 
@@ -121,7 +118,7 @@ class CRMApp {
         const statusClass = `status-${client.status}`;
         const typeClass = `type-${client.company_type}`;
         const initials = this.getInitials(client.name);
-        
+
         return `
             <tr onclick="crmApp.selectClient(${client.id})" style="cursor: pointer;">
                 <td>
@@ -178,12 +175,12 @@ class CRMApp {
     showClientDetail(client) {
         document.getElementById('clientList').style.display = 'none';
         document.getElementById('clientDetail').classList.add('active');
-        
+
         const initials = this.getInitials(client.name);
         const fullAddress = this.formatAddress(client);
-        
+
         document.getElementById('mainTitle').textContent = `Company - ID ${client.id} - ${client.name}`;
-        
+
         const detailContent = `
             <div class="client-detail-header">
                 <div class="client-info">
@@ -197,7 +194,7 @@ class CRMApp {
                         </div>
                     </div>
                 </div>
-                
+
                 <div style="display: flex; gap: 1rem; align-items: center;">
                     ${client.company_type ? `<span class="client-type type-${client.company_type}">${client.company_type}</span>` : ''}
                     ${client.status ? `<span class="client-status status-${client.status}">${client.status}</span>` : ''}
@@ -206,7 +203,7 @@ class CRMApp {
                     </button>
                 </div>
             </div>
-            
+
             <div class="client-tabs">
                 <button class="client-tab active" onclick="crmApp.switchTab('activity')">Activity</button>
                 <button class="client-tab" onclick="crmApp.switchTab('contacts')">Contacts (${client.contacts?.length || 0})</button>
@@ -214,28 +211,28 @@ class CRMApp {
                 <button class="client-tab" onclick="crmApp.switchTab('todos')">To-Dos (${client.todos?.length || 0})</button>
                 <button class="client-tab" onclick="crmApp.switchTab('attachments')">Attachments (${client.attachments?.length || 0})</button>
             </div>
-            
+
             <div id="activityTab" class="tab-content active">
                 ${this.renderActivityTab(client)}
             </div>
-            
+
             <div id="contactsTab" class="tab-content">
                 ${this.renderContactsTab(client)}
             </div>
-            
+
             <div id="tasksTab" class="tab-content">
                 ${this.renderTasksTab(client)}
             </div>
-            
+
             <div id="todosTab" class="tab-content">
                 ${this.renderTodosTab(client)}
             </div>
-            
+
             <div id="attachmentsTab" class="tab-content">
                 ${this.renderAttachmentsTab(client)}
             </div>
         `;
-        
+
         document.getElementById('clientDetail').innerHTML = detailContent;
     }
 
@@ -245,11 +242,10 @@ class CRMApp {
     }
 
     switchTab(tabName) {
-        // Hide all tabs
+
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.client-tab').forEach(tab => tab.classList.remove('active'));
-        
-        // Show selected tab
+
         document.getElementById(tabName + 'Tab').classList.add('active');
         event.target.classList.add('active');
     }
@@ -316,7 +312,7 @@ class CRMApp {
                         </button>
                     </div>
                 </div>
-                
+
                 <div style="margin: 1rem 0; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 1rem;">
                         <label style="display: inline-block; margin-right: 0.5rem; font-weight: 500;">Status:</label>
@@ -329,7 +325,7 @@ class CRMApp {
                         <i class="fas fa-times"></i> Clear Search
                     </button>
                 </div>
-                
+
                 <div class="table-container" style="background: var(--card-background); border-radius: var(--border-radius); overflow: hidden; border: 1px solid var(--border-color);">
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead style="background: var(--background-color);">
@@ -395,7 +391,7 @@ class CRMApp {
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
                     1 - ${client.contacts ? client.contacts.length : 0} of ${client.contacts ? client.contacts.length : 0}
                 </div>
@@ -492,7 +488,7 @@ class CRMApp {
     renderAttachmentsTab(client) {
         console.log('Rendering attachments for client:', client);
         console.log('Attachments:', client.attachments);
-        
+
         if (!client.attachments || client.attachments.length === 0) {
             return `
                 <div class="empty-state">
@@ -547,16 +543,14 @@ class CRMApp {
 
     formatDate(dateString) {
         if (!dateString) return '';
-        
-        // Create date object and ensure it's treated as UTC if it doesn't have timezone info
+
         let date = new Date(dateString);
-        
-        // If the date string doesn't have timezone info, assume it's UTC
+
         if (dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
-            // Add UTC indicator if missing
+
             date = new Date(dateString + 'Z');
         }
-        
+
         return date.toLocaleString('en-US', {
             timeZone: 'America/New_York',
             year: 'numeric',
@@ -587,13 +581,13 @@ class CRMApp {
 
     async createClient(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             await this.apiCall('crm-clients', 'POST', data);
-            
+
             this.hideNewClientModal();
             this.showNotification('Client created successfully!', 'success');
             await this.loadClients();
@@ -605,20 +599,17 @@ class CRMApp {
     async editClient(clientId) {
         try {
             console.log('Edit client called with ID:', clientId);
-            
-            // Get the client data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             console.log('Client data loaded:', client);
-            
-            // Check if modal exists
+
             const modal = document.getElementById('editClientModal');
             if (!modal) {
                 console.error('Edit modal not found!');
                 this.showNotification('Edit modal not found', 'error');
                 return;
             }
-            
-            // Populate the edit form
+
             document.getElementById('editClientName').value = client.name || '';
             document.getElementById('editClientEmail').value = client.email || '';
             document.getElementById('editClientType').value = client.company_type || 'lead';
@@ -637,11 +628,9 @@ class CRMApp {
             document.getElementById('editCountry').value = client.country || 'United States';
             document.getElementById('editClassification').value = client.classification || '';
             document.getElementById('editClientNotes').value = client.notes || '';
-            
-            // Store the client ID for the update
+
             this.editingClientId = clientId;
-            
-            // Show the modal
+
             modal.style.display = 'block';
             console.log('Edit modal should now be visible');
         } catch (error) {
@@ -656,59 +645,53 @@ class CRMApp {
 
     async addActivity(clientId) {
         this.currentClientId = clientId;
-        this.editingActivityId = null; // Reset editing state
-        
-        // Reset form
+        this.editingActivityId = null; 
+
         const titleElement = document.getElementById('activityTitle');
         const descriptionElement = document.getElementById('activityDescription');
         const typeElement = document.getElementById('activityType');
-        
+
         if (titleElement) titleElement.value = '';
         if (descriptionElement) descriptionElement.value = '';
         if (typeElement) typeElement.value = 'note';
-        
-        // Update modal title and button
+
         const modalTitle = document.querySelector('#addActivityModal .modal-header h2');
         const submitButton = document.querySelector('#addActivityForm button[type="submit"]');
-        
+
         if (modalTitle) modalTitle.textContent = 'Add Activity';
         if (submitButton) submitButton.textContent = 'Add Activity';
-        
+
         document.getElementById('addActivityModal').style.display = 'block';
     }
 
     async editActivity(clientId, activityId) {
         try {
-            // Get the current activity data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             const activity = client.activities.find(a => a.id == activityId);
-            
+
             if (!activity) {
                 this.showNotification('Activity not found', 'error');
                 return;
             }
-            
-            // Populate the edit form (we'll use the add activity modal for editing)
+
             const titleElement = document.getElementById('activityTitle');
             const descriptionElement = document.getElementById('activityDescription');
             const typeElement = document.getElementById('activityType');
-            
+
             if (titleElement) titleElement.value = activity.title || '';
             if (descriptionElement) descriptionElement.value = activity.description || '';
             if (typeElement) typeElement.value = activity.activity_type || 'note';
-            
-            // Store the activity ID for the update
+
             this.editingActivityId = activityId;
             this.currentClientId = clientId;
-            
-            // Update modal title and button
+
             const modalTitle = document.querySelector('#addActivityModal .modal-header h2');
             const submitButton = document.querySelector('#addActivityForm button[type="submit"]');
-            
+
             if (modalTitle) modalTitle.textContent = 'Edit Activity';
             if (submitButton) submitButton.textContent = 'Update Activity';
-            
-            // Show the modal
+
             document.getElementById('addActivityModal').style.display = 'block';
         } catch (error) {
             console.error('Error loading activity for edit:', error);
@@ -720,12 +703,11 @@ class CRMApp {
         if (!confirm('Are you sure you want to delete this activity?')) {
             return;
         }
-        
+
         try {
             await this.apiCall(`crm-activities&client_id=${clientId}&activity_id=${activityId}`, 'DELETE');
             this.showNotification('Activity deleted successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -741,7 +723,7 @@ class CRMApp {
     }
 
     async createTask(clientId) {
-        // Redirect to Kanban board with client pre-selected
+
         window.location.href = `index.html?client=${clientId}`;
     }
 
@@ -757,39 +739,35 @@ class CRMApp {
 
     async submitAttachment(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const fileInput = document.getElementById('attachmentFile');
             const file = fileInput.files[0];
-            
+
             if (!file) {
                 this.showNotification('Please select a file', 'error');
                 return;
             }
-            
-            // Check file size (10MB limit)
+
             if (file.size > 10 * 1024 * 1024) {
                 this.showNotification('File size must be less than 10MB', 'error');
                 return;
             }
-            
-            // Add file to form data
+
             formData.append('file', file);
             formData.append('client_id', this.currentClientId);
-            
-            // Show loading state
+
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
             submitBtn.textContent = 'Uploading...';
             submitBtn.disabled = true;
-            
-            // Upload file
+
             const response = await fetch(`api.php?endpoint=crm-attachments&client_id=${this.currentClientId}`, {
                 method: 'POST',
                 body: formData
             });
-            
+
             if (!response.ok) {
                 let errorMessage = 'Upload failed';
                 try {
@@ -800,22 +778,21 @@ class CRMApp {
                 }
                 throw new Error(errorMessage);
             }
-            
+
             const result = await response.json();
-            
+
             this.hideUploadAttachmentModal();
             this.showNotification('Attachment uploaded successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
-            
+
         } catch (error) {
             console.error('Error uploading attachment:', error);
             this.showNotification('Error uploading attachment: ' + error.message, 'error');
         } finally {
-            // Reset button state
+
             const submitBtn = event.target.querySelector('button[type="submit"]');
             submitBtn.textContent = 'Upload Attachment';
             submitBtn.disabled = false;
@@ -823,11 +800,10 @@ class CRMApp {
     }
 
     downloadAttachment(filename) {
-        // Construct the full file path based on current client
+
         const clientName = this.currentClient ? this.currentClient.name.replace(/[^a-zA-Z0-9]/g, '_') : '';
         const filepath = `uploads/crm/${clientName}/${filename}`;
-        
-        // Create a temporary link to download the file
+
         const link = document.createElement('a');
         link.href = filepath;
         link.download = '';
@@ -841,12 +817,11 @@ class CRMApp {
         if (!confirm('Are you sure you want to delete this attachment?')) {
             return;
         }
-        
+
         try {
             await this.apiCall(`crm-attachments&client_id=${clientId}&attachment_id=${attachmentId}`, 'DELETE');
             this.showNotification('Attachment deleted successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -858,16 +833,15 @@ class CRMApp {
 
     async editContact(clientId, contactId) {
         try {
-            // Get the current contact data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             const contact = client.contacts.find(c => c.id == contactId);
-            
+
             if (!contact) {
                 this.showNotification('Contact not found', 'error');
                 return;
             }
-            
-            // Populate the edit form with null checks
+
             const nameElement = document.getElementById('editContactNameField');
             const emailElement = document.getElementById('editContactEmail');
             const phoneElement = document.getElementById('editContactPhone');
@@ -875,7 +849,7 @@ class CRMApp {
             const positionElement = document.getElementById('editContactPosition');
             const primaryElement = document.getElementById('editContactIsPrimary');
             const billingElement = document.getElementById('editContactIsBilling');
-            
+
             if (nameElement) nameElement.value = contact.name || '';
             if (emailElement) emailElement.value = contact.email || '';
             if (phoneElement) phoneElement.value = contact.phone || '';
@@ -883,12 +857,10 @@ class CRMApp {
             if (positionElement) positionElement.value = contact.position || '';
             if (primaryElement) primaryElement.checked = contact.is_primary;
             if (billingElement) billingElement.checked = contact.is_billing_contact;
-            
-            // Store the contact ID for the update
+
             document.getElementById('editContactForm').setAttribute('data-contact-id', contactId);
             document.getElementById('editContactForm').setAttribute('data-client-id', clientId);
-            
-            // Show the edit modal
+
             document.getElementById('editContactModal').style.display = 'block';
         } catch (error) {
             console.error('Error loading contact for edit:', error);
@@ -900,12 +872,11 @@ class CRMApp {
         if (!confirm('Are you sure you want to delete this contact?')) {
             return;
         }
-        
+
         try {
             await this.apiCall(`crm-contacts&client_id=${clientId}&contact_id=${contactId}`, 'DELETE');
             this.showNotification('Contact deleted successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -917,19 +888,17 @@ class CRMApp {
 
     showContactActions(clientId, contactId, event) {
         event.stopPropagation();
-        
-        // Hide all other action menus first
+
         document.querySelectorAll('[id^="contactActions_"]').forEach(menu => {
             menu.style.display = 'none';
         });
-        
-        // Toggle the clicked menu
+
         const menu = document.getElementById(`contactActions_${contactId}`);
         if (menu) {
             const isVisible = menu.style.display === 'block';
-            
+
             if (isVisible) {
-                // Close menu and reset positioning
+
                 menu.style.display = 'none';
                 menu.style.position = 'absolute';
                 menu.style.top = '100%';
@@ -940,52 +909,43 @@ class CRMApp {
                 menu.style.marginTop = '5px';
                 menu.style.marginBottom = '0';
             } else {
-                // Open menu
+
                 menu.style.display = 'block';
-                
-                // If opening the menu, check if it will be cut off
+
                 const button = event.target.closest('button');
                 const buttonRect = button.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
                 const tableContainer = button.closest('.table-container');
                 const tableRect = tableContainer ? tableContainer.getBoundingClientRect() : null;
-                
-                // Position menu near the button but ensure it's visible
+
                 const menuHeight = 120;
                 const menuWidth = 120;
-                
-                // Calculate position
+
                 let top = buttonRect.bottom + 5;
                 let left = buttonRect.left;
-                
-                // Adjust if it would go off the bottom
+
                 if (top + menuHeight > viewportHeight) {
                     top = buttonRect.top - menuHeight - 5;
                 }
-                
-                // Adjust if it would go off the right
+
                 if (left + menuWidth > window.innerWidth) {
                     left = window.innerWidth - menuWidth - 10;
                 }
-                
-                // Ensure it doesn't go off the left
+
                 if (left < 10) {
                     left = 10;
                 }
-                
-                // Ensure it doesn't go off the top
+
                 if (top < 10) {
                     top = 10;
                 }
-                
+
                 menu.style.top = top + 'px';
                 menu.style.left = left + 'px';
-                
-                // Remove the old horizontal positioning code since we're using fixed positioning
+
             }
         }
-        
-        // Close menu when clicking outside
+
         setTimeout(() => {
             const closeMenu = (e) => {
                 if (!menu.contains(e.target) && !event.target.contains(e.target)) {
@@ -1019,7 +979,6 @@ class CRMApp {
                    (!activitySearch || activity.includes(activitySearch));
         });
 
-        // Update the table body with filtered results
         const tbody = document.querySelector('#contactsTab .table-container tbody');
         if (tbody) {
             tbody.innerHTML = filteredContacts.length > 0 ? 
@@ -1054,7 +1013,6 @@ class CRMApp {
                 `<tr><td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No contacts found</td></tr>`;
         }
 
-        // Update the count display
         const countDisplay = document.querySelector('#contactsTab .table-container + div');
         if (countDisplay) {
             countDisplay.innerHTML = `1 - ${filteredContacts.length} of ${this.currentClient.contacts.length}`;
@@ -1062,62 +1020,58 @@ class CRMApp {
     }
 
     clearContactSearch() {
-        // Clear all search inputs
+
         const searchInputs = [
             'contactNameSearch',
             'contactPhoneSearch', 
             'contactMobileSearch',
             'contactActivitySearch'
         ];
-        
+
         searchInputs.forEach(id => {
             const input = document.getElementById(id);
             if (input) {
                 input.value = '';
             }
         });
-        
-        // Re-filter to show all contacts
+
         this.filterContacts();
     }
 
     async editTodo(clientId, todoId) {
         console.log('editTodo called with:', clientId, todoId);
         try {
-            // Get the current todo data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             const todo = client.todos.find(t => t.id == todoId);
-            
+
             console.log('Found todo:', todo);
-            
+
             if (!todo) {
                 this.showNotification('Todo not found', 'error');
                 return;
             }
-            
-            // Populate the edit form with null checks
+
             const setElementValue = (id, value) => {
                 const element = document.getElementById(id);
                 if (element) {
                     element.value = value;
                 }
             };
-            
+
             setElementValue('editTodoTitle', todo.title);
             setElementValue('editTodoDescription', todo.description || '');
             setElementValue('editTodoDueDate', todo.due_date || '');
             setElementValue('editTodoDueTime', todo.due_time || '');
             setElementValue('editTodoPriority', todo.priority);
             setElementValue('editTodoStatus', todo.status || 'pending');
-            
-            // Store the todo ID for the update
+
             const editForm = document.getElementById('editTodoForm');
             if (editForm) {
                 editForm.setAttribute('data-todo-id', todoId);
                 editForm.setAttribute('data-client-id', clientId);
             }
-            
-            // Show the edit modal
+
             const editModal = document.getElementById('editTodoModal');
             console.log('Edit modal element:', editModal);
             if (editModal) {
@@ -1139,12 +1093,11 @@ class CRMApp {
         if (!confirm('Are you sure you want to delete this todo?')) {
             return;
         }
-        
+
         try {
             await this.apiCall(`crm-todos&client_id=${clientId}&todo_id=${todoId}`, 'DELETE');
             this.showNotification('Todo deleted successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1156,40 +1109,36 @@ class CRMApp {
 
     async viewTodo(clientId, todoId) {
         try {
-            // Get the current todo data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             const todo = client.todos.find(t => t.id == todoId);
-            
+
             if (!todo) {
                 this.showNotification('Todo not found', 'error');
                 return;
             }
-            
-            // Store the todo data for editing
+
             this.currentViewTodo = { clientId, todoId, todo };
-            
-            // Populate the view modal with null checks
+
             const setElementText = (id, text) => {
                 const element = document.getElementById(id);
                 if (element) {
                     element.textContent = text;
                 }
             };
-            
+
             setElementText('viewTodoTitle', todo.title);
             setElementText('viewTodoDescription', todo.description || 'No description provided');
             setElementText('viewTodoDueDate', todo.due_date ? this.formatDate(todo.due_date) : 'No due date');
             setElementText('viewTodoDueTime', todo.due_time || 'No due time');
             setElementText('viewTodoPriority', todo.priority);
-            
-            // Show status
+
             let statusText = (todo.status || 'pending').charAt(0).toUpperCase() + (todo.status || 'pending').slice(1);
             setElementText('viewTodoStatus', statusText);
-            
-            // Show completion date if closed
+
             const completedStatusDiv = document.getElementById('viewTodoCompletedStatus');
             const completedDateDiv = document.getElementById('viewTodoCompletedDate');
-            
+
             if (todo.status === 'closed' && todo.completed_at) {
                 if (completedDateDiv) {
                     completedDateDiv.textContent = this.formatDate(todo.completed_at);
@@ -1202,11 +1151,10 @@ class CRMApp {
                     completedStatusDiv.style.display = 'none';
                 }
             }
-            
+
             setElementText('viewTodoUser', todo.user_name);
             setElementText('viewTodoCreated', this.formatDate(todo.created_at));
-            
-            // Show the view modal
+
             document.getElementById('viewTodoModal').style.display = 'block';
         } catch (error) {
             console.error('Error loading todo for view:', error);
@@ -1216,16 +1164,15 @@ class CRMApp {
 
     async viewContact(clientId, contactId) {
         try {
-            // Get the current contact data
+
             const client = await this.apiCall(`crm-client&id=${clientId}`);
             const contact = client.contacts.find(c => c.id == contactId);
-            
+
             if (!contact) {
                 this.showNotification('Contact not found', 'error');
                 return;
             }
-            
-            // Populate the view modal
+
             document.getElementById('viewContactName').textContent = contact.name;
             document.getElementById('viewContactEmail').textContent = contact.email || 'No email provided';
             document.getElementById('viewContactPhone').textContent = contact.phone || 'No phone provided';
@@ -1234,8 +1181,7 @@ class CRMApp {
             document.getElementById('viewContactPrimary').textContent = contact.is_primary ? 'Yes' : 'No';
             document.getElementById('viewContactBilling').textContent = contact.is_billing_contact ? 'Yes' : 'No';
             document.getElementById('viewContactCreated').textContent = this.formatDate(contact.created_at);
-            
-            // Show the view modal
+
             document.getElementById('viewContactModal').style.display = 'block';
         } catch (error) {
             console.error('Error loading contact for view:', error);
@@ -1247,25 +1193,25 @@ class CRMApp {
         const searchTerm = document.getElementById('clientSearch').value.toLowerCase();
         const statusFilter = document.getElementById('statusFilter').value;
         const typeFilter = document.getElementById('typeFilter').value;
-        
+
         const filteredClients = this.clients.filter(client => {
             const matchesSearch = !searchTerm || 
                 client.name.toLowerCase().includes(searchTerm) ||
                 client.email.toLowerCase().includes(searchTerm) ||
                 (client.contact_name && client.contact_name.toLowerCase().includes(searchTerm));
-            
+
             const matchesStatus = !statusFilter || client.status === statusFilter;
             const matchesType = !typeFilter || client.company_type === typeFilter;
-            
+
             return matchesSearch && matchesStatus && matchesType;
         });
-        
+
         this.renderFilteredClients(filteredClients);
     }
 
     renderFilteredClients(clients) {
         const container = document.getElementById('clientTableContainer');
-        
+
         if (clients.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -1294,7 +1240,7 @@ class CRMApp {
                 </tbody>
             </table>
         `;
-        
+
         container.innerHTML = table;
     }
 
@@ -1303,7 +1249,7 @@ class CRMApp {
     }
 
     showNotification(message, type = 'info') {
-        // Simple notification implementation
+
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
@@ -1317,37 +1263,37 @@ class CRMApp {
             background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
         `;
         notification.textContent = message;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.remove();
         }, 3000);
     }
 
     setupEventListeners() {
-        // Close modal when clicking outside
+
         window.onclick = (event) => {
             const modal = document.getElementById('newClientModal');
             if (event.target === modal) {
                 this.hideNewClientModal();
             }
-            
+
             const activityModal = document.getElementById('addActivityModal');
             if (event.target === activityModal) {
                 this.hideAddActivityModal();
             }
-            
+
             const contactModal = document.getElementById('addContactModal');
             if (event.target === contactModal) {
                 this.hideAddContactModal();
             }
-            
+
             const todoModal = document.getElementById('addTodoModal');
             if (event.target === todoModal) {
                 this.hideAddTodoModal();
             }
-            
+
             const editModal = document.getElementById('editClientModal');
             if (event.target === editModal) {
                 this.hideEditClientModal();
@@ -1355,7 +1301,6 @@ class CRMApp {
         };
     }
 
-    // Modal handling functions
     hideAddActivityModal() {
         document.getElementById('addActivityModal').style.display = 'none';
         document.getElementById('addActivityForm').reset();
@@ -1392,28 +1337,25 @@ class CRMApp {
         if (modal) {
             modal.style.display = 'none';
         }
-        
-        // Clear all the content fields to prevent null reference errors
+
         const fields = [
             'viewTodoTitle', 'viewTodoDescription', 'viewTodoDueDate', 
             'viewTodoDueTime', 'viewTodoPriority', 'viewTodoStatus', 
             'viewTodoUser', 'viewTodoCreated', 'viewTodoCompletedDate'
         ];
-        
+
         fields.forEach(fieldId => {
             const element = document.getElementById(fieldId);
             if (element) {
                 element.textContent = '';
             }
         });
-        
-        // Hide the completed status section
+
         const completedStatusDiv = document.getElementById('viewTodoCompletedStatus');
         if (completedStatusDiv) {
             completedStatusDiv.style.display = 'none';
         }
-        
-        // Clear the current view todo data
+
         this.currentViewTodo = null;
     }
 
@@ -1426,8 +1368,7 @@ class CRMApp {
         if (modal) {
             modal.style.display = 'none';
         }
-        
-        // Reset the form
+
         const form = document.getElementById('uploadAttachmentForm');
         if (form) {
             form.reset();
@@ -1436,20 +1377,18 @@ class CRMApp {
 
     async updateClient(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             await this.apiCall(`crm-client&id=${this.editingClientId}`, 'PUT', data);
-            
+
             this.hideEditClientModal();
             this.showNotification('Client updated successfully!', 'success');
-            
-            // Refresh the clients list
+
             await this.loadClients();
-            
-            // If we're currently viewing this client, refresh the detail view
+
             if (this.currentClient && this.currentClient.id === this.editingClientId) {
                 await this.selectClient(this.editingClientId);
             }
@@ -1461,25 +1400,24 @@ class CRMApp {
 
     async submitActivity(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             if (this.editingActivityId) {
-                // Update existing activity
+
                 await this.apiCall(`crm-activities&client_id=${this.currentClientId}&activity_id=${this.editingActivityId}`, 'PUT', data);
                 this.showNotification('Activity updated successfully!', 'success');
                 this.editingActivityId = null;
             } else {
-                // Add new activity
+
                 await this.apiCall(`crm-activities&client_id=${this.currentClientId}`, 'POST', data);
                 this.showNotification('Activity added successfully!', 'success');
             }
-            
+
             this.hideAddActivityModal();
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1491,21 +1429,19 @@ class CRMApp {
 
     async submitContact(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
-            
-            // Convert checkboxes to boolean
+
             data.is_primary = formData.get('is_primary') === 'on';
             data.is_billing_contact = formData.get('is_billing_contact') === 'on';
-            
+
             await this.apiCall(`crm-contacts&client_id=${this.currentClientId}`, 'POST', data);
-            
+
             this.hideAddContactModal();
             this.showNotification('Contact added successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1516,17 +1452,16 @@ class CRMApp {
 
     async submitTodo(event) {
         event.preventDefault();
-        
+
         try {
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
-            
+
             await this.apiCall(`crm-todos&client_id=${this.currentClientId}`, 'POST', data);
-            
+
             this.hideAddTodoModal();
             this.showNotification('To-do added successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1537,25 +1472,23 @@ class CRMApp {
 
     async submitEditContact(event) {
         event.preventDefault();
-        
+
         try {
             const form = event.target;
             const contactId = form.getAttribute('data-contact-id');
             const clientId = form.getAttribute('data-client-id');
-            
+
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            
-            // Convert checkboxes to boolean
+
             data.is_primary = formData.get('is_primary') === 'on';
             data.is_billing_contact = formData.get('is_billing_contact') === 'on';
-            
+
             await this.apiCall(`crm-contacts&client_id=${clientId}&contact_id=${contactId}`, 'PUT', data);
-            
+
             this.hideEditContactModal();
             this.showNotification('Contact updated successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1566,27 +1499,24 @@ class CRMApp {
 
     async submitEditTodo(event) {
         event.preventDefault();
-        
+
         try {
             const form = event.target;
             const todoId = form.getAttribute('data-todo-id');
             const clientId = form.getAttribute('data-client-id');
-            
+
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            
-            // Handle completion based on status
+
             data.is_completed = data.status === 'closed';
-            
-            // Ensure status is set
+
             data.status = data.status || 'pending';
-            
+
             await this.apiCall(`crm-todos&client_id=${clientId}&todo_id=${todoId}`, 'PUT', data);
-            
+
             this.hideEditTodoModal();
             this.showNotification('Todo updated successfully!', 'success');
-            
-            // Refresh client data
+
             if (this.currentClient) {
                 await this.selectClient(this.currentClient.id);
             }
@@ -1596,11 +1526,9 @@ class CRMApp {
     }
 }
 
-// Initialize CRM app
 const crmApp = new CRMApp();
 console.log('CRM App initialized:', crmApp);
 
-// Global functions for HTML onclick handlers
 function showNewClientModal() {
     crmApp.showNewClientModal();
 }
@@ -1673,10 +1601,10 @@ function editTodoFromView() {
     console.log('editTodoFromView called');
     if (crmApp.currentViewTodo) {
         console.log('Current view todo:', crmApp.currentViewTodo);
-        // Store the data before hiding the modal
+
         const todoData = { ...crmApp.currentViewTodo };
         crmApp.hideViewTodoModal();
-        // Small delay to ensure modal is closed before opening edit modal
+
         setTimeout(() => {
             console.log('Calling editTodo with:', todoData.clientId, todoData.todoId);
             crmApp.editTodo(todoData.clientId, todoData.todoId);
@@ -1699,8 +1627,7 @@ function goToKanban() {
     crmApp.goToKanban();
 }
 
-// Test function for debugging
 function testEditClient(clientId = 1) {
     console.log('Testing edit client with ID:', clientId);
     crmApp.editClient(clientId);
-} 
+}

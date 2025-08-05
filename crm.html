@@ -253,7 +253,6 @@
             color: white;
         }
 
-        /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .crm-container {
                 flex-direction: column;
@@ -860,14 +859,14 @@
                     <i class="fas fa-plus"></i> New Client
                 </button>
             </div>
-            
+
             <div class="client-filters" style="padding: 1rem;">
                 <div class="client-search">
                     <i class="fas fa-search"></i>
                     <input type="text" id="clientSearch" placeholder="Search clients..." onkeyup="filterClients()">
                 </div>
             </div>
-            
+
             <div class="client-list">
                 <div class="client-list-header">
                     <h3>Clients</h3>
@@ -886,7 +885,7 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div id="clientTableContainer">
                     <div class="loading">
                         <i class="fas fa-spinner"></i>
@@ -906,7 +905,7 @@
                     </button>
                 </div>
             </div>
-            
+
             <div class="crm-content">
                 <div id="clientList" class="client-list">
                     <div class="empty-state">
@@ -915,7 +914,7 @@
                         <p>Select a client from the sidebar to view details</p>
                     </div>
                 </div>
-                
+
                 <div id="clientDetail" class="client-detail">
                     <!-- Client detail content will be loaded here -->
                 </div>
@@ -932,7 +931,7 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="newClientForm" onsubmit="createClient(event)">
                 <div class="modal-body">
                     <div class="form-grid">
@@ -940,12 +939,12 @@
                             <label for="clientName">Company Name <span class="required">*</span></label>
                             <input type="text" id="clientName" name="name" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientEmail">Email <span class="required">*</span></label>
                             <input type="email" id="clientEmail" name="email" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientType">Company Type <span class="required">*</span></label>
                             <select id="clientType" name="company_type" required>
@@ -955,7 +954,7 @@
                                 <option value="vendor">Vendor</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientStatus">Status <span class="required">*</span></label>
                             <select id="clientStatus" name="status" required>
@@ -964,7 +963,7 @@
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientCategory">Company Category</label>
                             <select id="clientCategory" name="company_category">
@@ -973,74 +972,74 @@
                                 <option value="Enterprise">Enterprise</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientNumber">Company Number</label>
                             <input type="text" id="clientNumber" name="company_number">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="contactName">Contact Name</label>
                             <input type="text" id="contactName" name="contact_name">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="contactNumber">Contact Number</label>
                             <input type="tel" id="contactNumber" name="contact_number">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="alternatePhone">Alternate Phone</label>
                             <input type="tel" id="alternatePhone" name="alternate_phone">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="clientUrl">Website</label>
                             <input type="url" id="clientUrl" name="url">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="address1">Address 1</label>
                             <input type="text" id="address1" name="address_1">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="address2">Address 2</label>
                             <input type="text" id="address2" name="address_2">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="city">City</label>
                             <input type="text" id="city" name="city">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="state">State</label>
                             <input type="text" id="state" name="state">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="zipCode">Zip Code</label>
                             <input type="text" id="zipCode" name="zip_code">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="country">Country</label>
                             <input type="text" id="country" name="country" value="United States">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="classification">Classification</label>
                             <input type="text" id="classification" name="classification">
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientNotes">Notes</label>
                         <textarea id="clientNotes" name="notes" rows="3"></textarea>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideNewClientModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Client</button>
@@ -1058,14 +1057,14 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="addActivityForm" onsubmit="addActivity(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="activityTitle">Title <span class="required">*</span></label>
                         <input type="text" id="activityTitle" name="title" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="activityType">Activity Type <span class="required">*</span></label>
                         <select id="activityType" name="activity_type" required>
@@ -1078,13 +1077,13 @@
                             <option value="invoice">Invoice</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="activityDescription">Description</label>
                         <textarea id="activityDescription" name="description" rows="4"></textarea>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideAddActivityModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Activity</button>
@@ -1102,41 +1101,41 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="addContactForm" onsubmit="addContact(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="contactName">Name <span class="required">*</span></label>
                         <input type="text" id="contactName" name="name" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="contactEmail">Email</label>
                         <input type="email" id="contactEmail" name="email">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="contactPhone">Phone</label>
                         <input type="tel" id="contactPhone" name="phone">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="contactMobilePhone">Mobile Phone</label>
                         <input type="tel" id="contactMobilePhone" name="mobile_phone">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="contactPosition">Position</label>
                         <input type="text" id="contactPosition" name="position">
                     </div>
-                    
+
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="isPrimary" name="is_primary">
                             Primary Contact
                         </label>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="isBilling" name="is_billing_contact">
@@ -1144,7 +1143,7 @@
                         </label>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideAddContactModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Contact</button>
@@ -1162,29 +1161,29 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="addTodoForm" onsubmit="addTodo(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="todoTitle">Title <span class="required">*</span></label>
                         <input type="text" id="todoTitle" name="title" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="todoDescription">Description</label>
                         <textarea id="todoDescription" name="description" rows="3"></textarea>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="todoDueDate">Due Date</label>
                         <input type="date" id="todoDueDate" name="due_date">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="todoDueTime">Due Time</label>
                         <input type="time" id="todoDueTime" name="due_time">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="todoPriority">Priority</label>
                         <select id="todoPriority" name="priority">
@@ -1193,7 +1192,7 @@
                             <option value="high">High</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="todoStatus">Status</label>
                         <select id="todoStatus" name="status">
@@ -1202,7 +1201,7 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideAddTodoModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add To-Do</button>
@@ -1220,7 +1219,7 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="editClientForm" onsubmit="updateClient(event)">
                 <div class="modal-body">
                     <div class="form-grid">
@@ -1228,12 +1227,12 @@
                             <label for="editClientName">Company Name <span class="required">*</span></label>
                             <input type="text" id="editClientName" name="name" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientEmail">Email <span class="required">*</span></label>
                             <input type="email" id="editClientEmail" name="email" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientType">Company Type <span class="required">*</span></label>
                             <select id="editClientType" name="company_type" required>
@@ -1243,7 +1242,7 @@
                                 <option value="vendor">Vendor</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientStatus">Status <span class="required">*</span></label>
                             <select id="editClientStatus" name="status" required>
@@ -1252,7 +1251,7 @@
                                 <option value="inactive">Inactive</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientCategory">Company Category</label>
                             <select id="editClientCategory" name="company_category">
@@ -1261,74 +1260,74 @@
                                 <option value="Enterprise">Enterprise</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientNumber">Company Number</label>
                             <input type="text" id="editClientNumber" name="company_number">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editContactName">Contact Name</label>
                             <input type="text" id="editContactName" name="contact_name">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editContactNumber">Contact Number</label>
                             <input type="tel" id="editContactNumber" name="contact_number">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editAlternatePhone">Alternate Phone</label>
                             <input type="tel" id="editAlternatePhone" name="alternate_phone">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClientUrl">Website</label>
                             <input type="url" id="editClientUrl" name="url">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editAddress1">Address 1</label>
                             <input type="text" id="editAddress1" name="address_1">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editAddress2">Address 2</label>
                             <input type="text" id="editAddress2" name="address_2">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editCity">City</label>
                             <input type="text" id="editCity" name="city">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editState">State</label>
                             <input type="text" id="editState" name="state">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editZipCode">Zip Code</label>
                             <input type="text" id="editZipCode" name="zip_code">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editCountry">Country</label>
                             <input type="text" id="editCountry" name="country" value="United States">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="editClassification">Classification</label>
                             <input type="text" id="editClassification" name="classification">
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editClientNotes">Notes</label>
                         <textarea id="editClientNotes" name="notes" rows="3"></textarea>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideEditClientModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Update Client</button>
@@ -1346,34 +1345,34 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="editContactForm" onsubmit="submitEditContact(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="editContactNameField">Name <span class="required">*</span></label>
                         <input type="text" id="editContactNameField" name="name" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editContactEmail">Email</label>
                         <input type="email" id="editContactEmail" name="email">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editContactPhone">Phone</label>
                         <input type="tel" id="editContactPhone" name="phone">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editContactMobilePhone">Mobile Phone</label>
                         <input type="tel" id="editContactMobilePhone" name="mobile_phone">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editContactPosition">Position</label>
                         <input type="text" id="editContactPosition" name="position">
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="editContactIsPrimary" name="is_primary">
@@ -1381,7 +1380,7 @@
                             Primary Contact
                         </label>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="editContactIsBilling" name="is_billing_contact">
@@ -1390,7 +1389,7 @@
                         </label>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideEditContactModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Update Contact</button>
@@ -1408,29 +1407,29 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="editTodoForm" onsubmit="submitEditTodo(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="editTodoTitle">Title <span class="required">*</span></label>
                         <input type="text" id="editTodoTitle" name="title" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editTodoDescription">Description</label>
                         <textarea id="editTodoDescription" name="description" rows="3"></textarea>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editTodoDueDate">Due Date</label>
                         <input type="date" id="editTodoDueDate" name="due_date">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editTodoDueTime">Due Time</label>
                         <input type="time" id="editTodoDueTime" name="due_time">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editTodoPriority">Priority</label>
                         <select id="editTodoPriority" name="priority">
@@ -1439,7 +1438,7 @@
                             <option value="high">High</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editTodoStatus">Status</label>
                         <select id="editTodoStatus" name="status">
@@ -1448,7 +1447,7 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideEditTodoModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Update To-Do</button>
@@ -1466,56 +1465,56 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <div class="modal-body">
                 <div class="todo-detail-grid">
                     <div class="detail-group">
                         <label class="detail-label">Title</label>
                         <div class="detail-value" id="viewTodoTitle"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Description</label>
                         <div class="detail-value" id="viewTodoDescription"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Due Date</label>
                         <div class="detail-value" id="viewTodoDueDate"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Due Time</label>
                         <div class="detail-value" id="viewTodoDueTime"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Priority</label>
                         <div class="detail-value" id="viewTodoPriority"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Status</label>
                         <div class="detail-value" id="viewTodoStatus"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Assigned To</label>
                         <div class="detail-value" id="viewTodoUser"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Created</label>
                         <div class="detail-value" id="viewTodoCreated"></div>
                     </div>
-                    
+
                     <div class="detail-group" id="viewTodoCompletedStatus" style="display: none;">
                         <label class="detail-label">Completed on</label>
                         <div class="detail-value" id="viewTodoCompletedDate"></div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="hideViewTodoModal()">Close</button>
                 <button type="button" class="btn btn-primary" id="viewTodoEditBtn" onclick="editTodoFromView()">Edit Todo</button>
@@ -1532,26 +1531,26 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <form id="uploadAttachmentForm" onsubmit="submitAttachment(event)">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="attachmentTitle">Title <span class="required">*</span></label>
                         <input type="text" id="attachmentTitle" name="title" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="attachmentDescription">Description</label>
                         <textarea id="attachmentDescription" name="description" rows="3"></textarea>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="attachmentFile">File <span class="required">*</span></label>
                         <input type="file" id="attachmentFile" name="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif">
                         <small class="form-help">Max file size: 10MB. Supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG, GIF</small>
                     </div>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="hideUploadAttachmentModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Upload Attachment</button>
@@ -1569,51 +1568,51 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <div class="modal-body">
                 <div class="contact-detail-grid">
                     <div class="detail-group">
                         <label class="detail-label">Name</label>
                         <div class="detail-value" id="viewContactName"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Email</label>
                         <div class="detail-value" id="viewContactEmail"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Phone</label>
                         <div class="detail-value" id="viewContactPhone"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Mobile Phone</label>
                         <div class="detail-value" id="viewContactMobilePhone"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Position</label>
                         <div class="detail-value" id="viewContactPosition"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Primary Contact</label>
                         <div class="detail-value" id="viewContactPrimary"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Billing Contact</label>
                         <div class="detail-value" id="viewContactBilling"></div>
                     </div>
-                    
+
                     <div class="detail-group">
                         <label class="detail-label">Created</label>
                         <div class="detail-value" id="viewContactCreated"></div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="hideViewContactModal()">Close</button>
             </div>
@@ -1622,4 +1621,4 @@
 
     <script src="assets/js/crm.js?v=1.2"></script>
 </body>
-</html> 
+</html>
