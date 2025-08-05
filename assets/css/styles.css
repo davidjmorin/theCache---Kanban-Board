@@ -953,6 +953,7 @@ div#userMenu {
     align-items: center;
     text-align: right;
     width: 100%;
+    text-align: center;
 }
 
 .client-name {
@@ -1959,11 +1960,16 @@ div#userMenu {
     cursor: pointer;
     font-size: 0.875rem;
     color: var(--text-primary);
+    position: relative;
+    padding-left: 0;
 }
 
 .checkbox-label input[type="checkbox"] {
-    margin-right: 0.5rem;
-    width: auto;
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
 }
 
 .checkmark {

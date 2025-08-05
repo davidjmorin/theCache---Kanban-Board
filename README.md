@@ -37,11 +37,21 @@ A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This 
 - **User Activation/Deactivation** - Control user access to the system
 - **Admin Controls** - Grant and revoke admin privileges
 
-### **🏢 Client Management**
+### **🏢 Client Management & CRM**
 - **Client Database** - Comprehensive client information management
 - **Client Assignment** - Associate tasks with specific clients
 - **Client Task Views** - View all tasks for a specific client
 - **Client Search** - Search and filter clients efficiently
+- **CRM System** - Full-featured Customer Relationship Management
+- **Client Profiles** - Detailed client information with contact details
+- **Client Activities** - Track all interactions and activities
+- **Client Contacts** - Manage multiple contacts per client
+- **Client Attachments** - Store and manage client documents
+- **Client To-Dos** - Create and track client-specific tasks
+- **Client Groups** - Organize clients into groups
+- **Activity History** - Complete audit trail of client interactions
+- **Client Status Tracking** - Lead, prospect, customer, vendor management
+- **Account Management** - Assign account managers to clients
 
 ### **📝 Notes & Communication**
 - **Task Notes** - Add detailed notes to any task
@@ -233,6 +243,21 @@ The application provides a comprehensive RESTful API:
 - `PUT /api/clients/{id}` - Update client
 - `DELETE /api/clients/{id}` - Delete client
 - `GET /api/clients/{id}/tasks` - Get client tasks
+
+### **CRM System**
+- `GET /api/crm-clients` - List all clients with CRM data
+- `POST /api/crm-clients` - Create new client with full CRM fields
+- `GET /api/crm-client?id={id}` - Get detailed client profile with all related data
+- `PUT /api/crm-client?id={id}` - Update client with CRM fields
+- `DELETE /api/crm-client?id={id}` - Delete client
+- `GET /api/crm-contacts?client_id={id}` - Get client contacts
+- `POST /api/crm-contacts?client_id={id}` - Add client contact
+- `GET /api/crm-activities?client_id={id}` - Get client activities
+- `POST /api/crm-activities?client_id={id}` - Add client activity
+- `GET /api/crm-todos?client_id={id}` - Get client to-dos
+- `POST /api/crm-todos?client_id={id}` - Add client to-do
+- `GET /api/crm-groups` - Get client groups
+- `POST /api/crm-groups` - Create client group
 
 ### **Notes**
 - `GET /api/notes` - List all notes

@@ -1,4 +1,7 @@
 <?php
+// Set timezone to Eastern
+date_default_timezone_set('America/New_York');
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -116,6 +119,9 @@ function createTables($pdo) {
 
     // Run migrations for existing tables
     runMigrations($pdo);
+    
+    // Run CRM migrations
+    runCrmMigrations($pdo);
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS attachments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -247,6 +253,139 @@ function runMigrations($pdo) {
     }
 }
 
+function runCrmMigrations($pdo) {
+    try {
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_number VARCHAR(50) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS alternate_phone VARCHAR(50) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS url VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_1 VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_2 VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS state VARCHAR(50) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS country VARCHAR(100) DEFAULT 'United States'");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS classification VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS status ENUM('active', 'inactive', 'lead', 'prospect') DEFAULT 'active'");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_type ENUM('customer', 'lead', 'prospect', 'vendor') DEFAULT 'lead'");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_category VARCHAR(100) DEFAULT 'Standard'");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS account_manager_id INT NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS created_by INT NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP NULL");
+        $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes TEXT NULL");
+        
+        // Add foreign key constraints
+        $pdo->exec("ALTER TABLE clients ADD CONSTRAINT IF NOT EXISTS fk_clients_account_manager 
+            FOREIGN KEY (account_manager_id) REFERENCES users(id) ON DELETE SET NULL");
+        $pdo->exec("ALTER TABLE clients ADD CONSTRAINT IF NOT EXISTS fk_clients_created_by 
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL");
+    } catch (Exception $e) {
+        // Columns might already exist, ignore error
+    }
+    
+    // Create client contacts table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_contacts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NULL,
+        phone VARCHAR(50) NULL,
+        position VARCHAR(100) NULL,
+        is_primary BOOLEAN DEFAULT FALSE,
+        is_billing_contact BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    )");
+
+    // Create client activities table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        user_id INT NOT NULL,
+        activity_type ENUM('note', 'call', 'email', 'meeting', 'task', 'quote', 'invoice') NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        activity_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create client attachments table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        filename VARCHAR(255) NOT NULL,
+        filepath VARCHAR(500) NOT NULL,
+        filesize INT NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create client todos table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_todos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        due_date DATE NULL,
+        due_time TIME NULL,
+        priority ENUM('low', 'medium', 'high') DEFAULT 'medium',
+        is_completed BOOLEAN DEFAULT FALSE,
+        completed_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create client groups table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_groups (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create client group members table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS client_group_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        group_id INT NOT NULL,
+        client_id INT NOT NULL,
+        added_by INT NOT NULL,
+        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_group_client (group_id, client_id),
+        FOREIGN KEY (group_id) REFERENCES client_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Add indexes for better performance
+    try {
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_company_type ON clients(company_type)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_account_manager ON clients(account_manager_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_activities_client ON client_activities(client_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_activities_date ON client_activities(activity_date)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_todos_client ON client_todos(client_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_todos_user ON client_todos(user_id)");
+        $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_contacts_client ON client_contacts(client_id)");
+    } catch (Exception $e) {
+        // Indexes might already exist, ignore error
+    }
+}
+
 function sendResponse($data, $status = 200) {
     http_response_code($status);
     echo json_encode($data);
@@ -278,4 +417,6 @@ function createNotification($pdo, $userId, $taskId, $message, $type) {
     $stmt->execute([$userId, $taskId, $message, $type]);
     return $pdo->lastInsertId();
 }
+
+
 ?>

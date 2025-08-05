@@ -97,6 +97,43 @@ switch ($endpoint) {
         requireAuth();
         handleDueTasks($pdo, $method);
         break;
+    case 'crm-clients':
+        requireAuth();
+        try {
+            handleCrmClients($pdo, $method);
+        } catch (Exception $e) {
+            sendResponse(['error' => 'CRM Clients error: ' . $e->getMessage()], 500);
+        }
+        break;
+    case 'crm-client':
+        requireAuth();
+        $clientId = $_GET['id'] ?? null;
+        handleCrmClient($pdo, $method, $clientId);
+        break;
+    case 'crm-contacts':
+        requireAuth();
+        $clientId = $_GET['client_id'] ?? null;
+        handleCrmContacts($pdo, $method, $clientId);
+        break;
+    case 'crm-activities':
+        requireAuth();
+        $clientId = $_GET['client_id'] ?? null;
+        handleCrmActivities($pdo, $method, $clientId);
+        break;
+    case 'crm-attachments':
+        requireAuth();
+        $clientId = $_GET['client_id'] ?? null;
+        handleCrmAttachments($pdo, $method, $clientId);
+        break;
+    case 'crm-todos':
+        requireAuth();
+        $clientId = $_GET['client_id'] ?? null;
+        handleCrmTodos($pdo, $method, $clientId);
+        break;
+    case 'crm-groups':
+        requireAuth();
+        handleCrmGroups($pdo, $method);
+        break;
             case 'send-due-notifications':
             handleDueNotifications($pdo, $method);
             break;
@@ -2300,5 +2337,746 @@ function handleUnshareTask($pdo, $method, $taskId) {
     }
 
     sendResponse(['success' => true, 'message' => 'Task access removed']);
+}
+
+// CRM Handler Functions
+function handleCrmClients($pdo, $method) {
+    switch ($method) {
+        case 'GET':
+            try {
+                $status = $_GET['status'] ?? null;
+                $type = $_GET['type'] ?? null;
+                $search = $_GET['search'] ?? null;
+                
+                $where = [];
+                $params = [];
+                
+                // Note: status and company_type filtering removed as columns may not exist
+                // if ($status) {
+                //     $where[] = "status = ?";
+                //     $params[] = $status;
+                // }
+                
+                // if ($type) {
+                //     $where[] = "company_type = ?";
+                //     $params[] = $type;
+                // }
+                
+                if ($search) {
+                    $where[] = "(c.name LIKE ? OR c.email LIKE ?)";
+                    $params[] = "%$search%";
+                    $params[] = "%$search%";
+                }
+                
+                $sql = "SELECT c.id, c.name, c.email 
+                        FROM clients c";
+                
+                if (!empty($where)) {
+                    $sql .= " WHERE " . implode(" AND ", $where);
+                }
+                
+                $sql .= " ORDER BY c.name";
+                
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                sendResponse($stmt->fetchAll());
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'POST':
+            $data = getRequestBody();
+            validateRequired($data, ['name', 'email']);
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO clients (
+                    name, email, company_number, contact_name, contact_number, 
+                    alternate_phone, url, address_1, address_2, city, state, 
+                    zip_code, country, classification, status, company_type, 
+                    company_category, account_manager_id, created_by, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $data['name'],
+                $data['email'],
+                $data['company_number'] ?? null,
+                $data['contact_name'] ?? null,
+                $data['contact_number'] ?? null,
+                $data['alternate_phone'] ?? null,
+                $data['url'] ?? null,
+                $data['address_1'] ?? null,
+                $data['address_2'] ?? null,
+                $data['city'] ?? null,
+                $data['state'] ?? null,
+                $data['zip_code'] ?? null,
+                $data['country'] ?? 'United States',
+                $data['classification'] ?? null,
+                $data['status'] ?? 'active',
+                $data['company_type'] ?? 'lead',
+                $data['company_category'] ?? 'Standard',
+                $data['account_manager_id'] ?? null,
+                getCurrentUser()['id'],
+                $data['notes'] ?? null
+            ]);
+            
+            $newId = $pdo->lastInsertId();
+            sendResponse(['id' => $newId, 'success' => true, 'message' => 'Client created successfully']);
+            break;
+    }
+}
+
+function handleCrmClient($pdo, $method, $id) {
+    if (!$id) {
+        sendResponse(['error' => 'Client ID required'], 400);
+    }
+    
+    switch ($method) {
+        case 'GET':
+            try {
+                // Get client with all related data
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.name, c.email, c.company_type, c.status, c.company_category, 
+                           c.contact_number, c.address_1, c.address_2, c.city, c.state, c.zip_code, 
+                           c.country, c.classification, c.notes, c.created_at, c.updated_at
+                    FROM clients c 
+                    WHERE c.id = ?
+                ");
+                $stmt->execute([$id]);
+                $client = $stmt->fetch();
+                
+                if (!$client) {
+                    sendResponse(['error' => 'Client not found'], 404);
+                }
+                
+                // Get related data with error handling
+                try {
+                    $contacts = getClientContacts($pdo, $id);
+                } catch (Exception $e) {
+                    $contacts = [];
+                }
+                
+                try {
+                    $activities = getClientActivities($pdo, $id);
+                } catch (Exception $e) {
+                    $activities = [];
+                }
+                
+                try {
+                    $attachments = getClientAttachments($pdo, $id);
+                } catch (Exception $e) {
+                    $attachments = [];
+                }
+                
+                try {
+                    $todos = getClientTodos($pdo, $id);
+                } catch (Exception $e) {
+                    $todos = [];
+                }
+                
+                try {
+                    $tasks = getClientTasks($pdo, $id);
+                } catch (Exception $e) {
+                    $tasks = [];
+                }
+                
+                $client['contacts'] = $contacts;
+                $client['activities'] = $activities;
+                $client['attachments'] = $attachments;
+                $client['todos'] = $todos;
+                $client['tasks'] = $tasks;
+                
+                sendResponse($client);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Error loading client: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'PUT':
+            $data = getRequestBody();
+            validateRequired($data, ['name', 'email']);
+            
+            $stmt = $pdo->prepare("
+                UPDATE clients SET 
+                    name = ?, email = ?, company_number = ?, contact_name = ?, 
+                    contact_number = ?, alternate_phone = ?, url = ?, address_1 = ?, 
+                    address_2 = ?, city = ?, state = ?, zip_code = ?, country = ?, 
+                    classification = ?, status = ?, company_type = ?, company_category = ?, 
+                    account_manager_id = ?, notes = ?, last_activity = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            
+            $stmt->execute([
+                $data['name'],
+                $data['email'],
+                $data['company_number'] ?? null,
+                $data['contact_name'] ?? null,
+                $data['contact_number'] ?? null,
+                $data['alternate_phone'] ?? null,
+                $data['url'] ?? null,
+                $data['address_1'] ?? null,
+                $data['address_2'] ?? null,
+                $data['city'] ?? null,
+                $data['state'] ?? null,
+                $data['zip_code'] ?? null,
+                $data['country'] ?? 'United States',
+                $data['classification'] ?? null,
+                $data['status'] ?? 'active',
+                $data['company_type'] ?? 'lead',
+                $data['company_category'] ?? 'Standard',
+                $data['account_manager_id'] ?? null,
+                $data['notes'] ?? null,
+                $id
+            ]);
+            
+            sendResponse(['success' => true, 'message' => 'Client updated successfully']);
+            break;
+            
+        case 'DELETE':
+            $stmt = $pdo->prepare("DELETE FROM clients WHERE id = ?");
+            $stmt->execute([$id]);
+            sendResponse(['success' => true, 'message' => 'Client deleted successfully']);
+            break;
+    }
+}
+
+function handleCrmContacts($pdo, $method, $clientId) {
+    switch ($method) {
+        case 'GET':
+            if ($clientId) {
+                sendResponse(getClientContacts($pdo, $clientId));
+            } else {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            break;
+            
+        case 'POST':
+            if (!$clientId) {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            
+            try {
+                $data = getRequestBody();
+                validateRequired($data, ['name']);
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO client_contacts (client_id, name, email, phone, mobile_phone, position, is_primary, is_billing_contact)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $clientId,
+                    $data['name'],
+                    $data['email'] ?? null,
+                    $data['phone'] ?? null,
+                    $data['mobile_phone'] ?? null,
+                    $data['position'] ?? null,
+                    $data['is_primary'] ? 1 : 0,
+                    $data['is_billing_contact'] ? 1 : 0
+                ]);
+                
+                $newId = $pdo->lastInsertId();
+                sendResponse(['id' => $newId, 'success' => true, 'message' => 'Contact created successfully']);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to create contact: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'PUT':
+            $contactId = $_GET['contact_id'] ?? null;
+            if (!$contactId) {
+                sendResponse(['error' => 'Contact ID required'], 400);
+            }
+            
+            try {
+                $data = getRequestBody();
+                validateRequired($data, ['name']);
+                
+                $stmt = $pdo->prepare("
+                    UPDATE client_contacts 
+                    SET name = ?, email = ?, phone = ?, mobile_phone = ?, position = ?, is_primary = ?, is_billing_contact = ?
+                    WHERE id = ? AND client_id = ?
+                ");
+                
+                $stmt->execute([
+                    $data['name'],
+                    $data['email'] ?? null,
+                    $data['phone'] ?? null,
+                    $data['mobile_phone'] ?? null,
+                    $data['position'] ?? null,
+                    $data['is_primary'] ? 1 : 0,
+                    $data['is_billing_contact'] ? 1 : 0,
+                    $contactId,
+                    $clientId
+                ]);
+                
+                if ($stmt->rowCount() > 0) {
+                    sendResponse(['success' => true, 'message' => 'Contact updated successfully']);
+                } else {
+                    sendResponse(['error' => 'Contact not found or no changes made'], 404);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to update contact: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'DELETE':
+            $contactId = $_GET['contact_id'] ?? null;
+            if (!$contactId) {
+                sendResponse(['error' => 'Contact ID required'], 400);
+            }
+            
+            try {
+                $stmt = $pdo->prepare("DELETE FROM client_contacts WHERE id = ? AND client_id = ?");
+                $stmt->execute([$contactId, $clientId]);
+                
+                if ($stmt->rowCount() > 0) {
+                    sendResponse(['success' => true, 'message' => 'Contact deleted successfully']);
+                } else {
+                    sendResponse(['error' => 'Contact not found'], 404);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to delete contact: ' . $e->getMessage()], 500);
+            }
+            break;
+    }
+}
+
+function handleCrmActivities($pdo, $method, $clientId) {
+    switch ($method) {
+        case 'GET':
+            if ($clientId) {
+                sendResponse(getClientActivities($pdo, $clientId));
+            } else {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            break;
+            
+        case 'POST':
+            if (!$clientId) {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            
+            $data = getRequestBody();
+            validateRequired($data, ['title', 'activity_type']);
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO client_activities (client_id, user_id, activity_type, title, description)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $clientId,
+                getCurrentUser()['id'],
+                $data['activity_type'],
+                $data['title'],
+                $data['description'] ?? null
+            ]);
+            
+            // Update client's last activity
+            $pdo->prepare("UPDATE clients SET last_activity = CURRENT_TIMESTAMP WHERE id = ?")->execute([$clientId]);
+            
+            $newId = $pdo->lastInsertId();
+            sendResponse(['id' => $newId, 'success' => true, 'message' => 'Activity created successfully']);
+            break;
+            
+        case 'PUT':
+            $activityId = $_GET['activity_id'] ?? null;
+            if (!$activityId || !$clientId) {
+                sendResponse(['error' => 'Activity ID and Client ID required'], 400);
+            }
+            
+            $data = getRequestBody();
+            validateRequired($data, ['title']);
+            
+            $stmt = $pdo->prepare("
+                UPDATE client_activities 
+                SET activity_type = ?, title = ?, description = ?
+                WHERE id = ? AND client_id = ?
+            ");
+            
+            $stmt->execute([
+                $data['activity_type'] ?? 'note',
+                $data['title'],
+                $data['description'] ?? null,
+                $activityId,
+                $clientId
+            ]);
+            
+            sendResponse(['success' => true, 'message' => 'Activity updated successfully']);
+            break;
+            
+        case 'DELETE':
+            $activityId = $_GET['activity_id'] ?? null;
+            if (!$activityId || !$clientId) {
+                sendResponse(['error' => 'Activity ID and Client ID required'], 400);
+            }
+            
+            $stmt = $pdo->prepare("DELETE FROM client_activities WHERE id = ? AND client_id = ?");
+            $stmt->execute([$activityId, $clientId]);
+            
+            sendResponse(['success' => true, 'message' => 'Activity deleted successfully']);
+            break;
+    }
+}
+
+function handleCrmTodos($pdo, $method, $clientId) {
+    switch ($method) {
+        case 'GET':
+            if ($clientId) {
+                sendResponse(getClientTodos($pdo, $clientId));
+            } else {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            break;
+            
+        case 'POST':
+            if (!$clientId) {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            
+            try {
+                $data = getRequestBody();
+                validateRequired($data, ['title']);
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO client_todos (client_id, user_id, title, description, due_date, due_time, priority, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $clientId,
+                    getCurrentUser()['id'],
+                    $data['title'],
+                    $data['description'] ?? null,
+                    $data['due_date'] ?? null,
+                    $data['due_time'] ?? null,
+                    $data['priority'] ?? 'medium',
+                    $data['status'] ?? 'pending'
+                ]);
+                
+                $newId = $pdo->lastInsertId();
+                sendResponse(['id' => $newId, 'success' => true, 'message' => 'Todo created successfully']);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to create todo: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'PUT':
+            $todoId = $_GET['todo_id'] ?? null;
+            if (!$todoId) {
+                sendResponse(['error' => 'Todo ID required'], 400);
+            }
+            
+            try {
+                $data = getRequestBody();
+                validateRequired($data, ['title']);
+                
+                // Set completion timestamp if status is being changed to closed
+                $completedAt = null;
+                if ($data['status'] === 'closed') {
+                    $completedAt = date('Y-m-d H:i:s');
+                }
+                
+                $stmt = $pdo->prepare("
+                    UPDATE client_todos 
+                    SET title = ?, description = ?, due_date = ?, due_time = ?, priority = ?, status = ?, is_completed = ?, completed_at = ?
+                    WHERE id = ? AND client_id = ?
+                ");
+                
+                $stmt->execute([
+                    $data['title'],
+                    $data['description'] ?? null,
+                    $data['due_date'] ?? null,
+                    $data['due_time'] ?? null,
+                    $data['priority'] ?? 'medium',
+                    $data['status'] ?? 'pending',
+                    $data['is_completed'] ? 1 : 0,
+                    $completedAt,
+                    $todoId,
+                    $clientId
+                ]);
+                
+                if ($stmt->rowCount() > 0) {
+                    sendResponse(['success' => true, 'message' => 'Todo updated successfully']);
+                } else {
+                    sendResponse(['error' => 'Todo not found or no changes made'], 404);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to update todo: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'DELETE':
+            $todoId = $_GET['todo_id'] ?? null;
+            if (!$todoId) {
+                sendResponse(['error' => 'Todo ID required'], 400);
+            }
+            
+            try {
+                $stmt = $pdo->prepare("DELETE FROM client_todos WHERE id = ? AND client_id = ?");
+                $stmt->execute([$todoId, $clientId]);
+                
+                if ($stmt->rowCount() > 0) {
+                    sendResponse(['success' => true, 'message' => 'Todo deleted successfully']);
+                } else {
+                    sendResponse(['error' => 'Todo not found'], 404);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to delete todo: ' . $e->getMessage()], 500);
+            }
+            break;
+    }
+}
+
+function handleCrmAttachments($pdo, $method, $clientId) {
+    switch ($method) {
+        case 'GET':
+            if ($clientId) {
+                sendResponse(getClientAttachments($pdo, $clientId));
+            } else {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            break;
+            
+        case 'POST':
+            if (!$clientId) {
+                sendResponse(['error' => 'Client ID required'], 400);
+            }
+            
+            try {
+                // Validate file upload
+                if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+                    sendResponse(['error' => 'File upload failed'], 400);
+                }
+                
+                $file = $_FILES['file'];
+                $title = $_POST['title'] ?? '';
+                $description = $_POST['description'] ?? '';
+                
+                if (empty($title)) {
+                    sendResponse(['error' => 'Title is required'], 400);
+                }
+                
+                // Validate file size (10MB limit)
+                if ($file['size'] > 10 * 1024 * 1024) {
+                    sendResponse(['error' => 'File size must be less than 10MB'], 400);
+                }
+                
+                // Validate file type
+                $allowedTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'jpg', 'jpeg', 'png', 'gif'];
+                $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                
+                if (!in_array($fileExtension, $allowedTypes)) {
+                    sendResponse(['error' => 'File type not allowed'], 400);
+                }
+                
+                // Get client name for folder structure
+                $stmt = $pdo->prepare("SELECT name FROM clients WHERE id = ?");
+                $stmt->execute([$clientId]);
+                $client = $stmt->fetch();
+                
+                if (!$client) {
+                    sendResponse(['error' => 'Client not found'], 404);
+                }
+                
+                // Create folder structure: uploads/crm/clientname/
+                $clientFolder = 'uploads/crm/' . preg_replace('/[^a-zA-Z0-9]/', '_', $client['name']);
+                $uploadDir = $clientFolder;
+                
+                // Create uploads directory if it doesn't exist
+                if (!is_dir('uploads')) {
+                    mkdir('uploads', 0755, true);
+                }
+                
+                // Create crm directory if it doesn't exist
+                if (!is_dir('uploads/crm')) {
+                    mkdir('uploads/crm', 0755, true);
+                }
+                
+                // Create client directory if it doesn't exist
+                if (!is_dir($uploadDir)) {
+                    if (!mkdir($uploadDir, 0755, true)) {
+                        sendResponse(['error' => 'Failed to create upload directory'], 500);
+                    }
+                }
+                
+                // Check if directory is writable
+                if (!is_writable($uploadDir)) {
+                    sendResponse(['error' => 'Upload directory is not writable'], 500);
+                }
+                
+                // Generate unique filename
+                $timestamp = date('Y-m-d_H-i-s');
+                $safeFilename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
+                $filename = $timestamp . '_' . $safeFilename;
+                $filepath = $uploadDir . '/' . $filename;
+                
+                // Move uploaded file
+                if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                    $uploadError = error_get_last();
+                    sendResponse(['error' => 'Failed to save file: ' . ($uploadError['message'] ?? 'Unknown error')], 500);
+                }
+                
+                // Save to database - using existing table structure
+                $stmt = $pdo->prepare("
+                    INSERT INTO client_attachments (client_id, uploaded_by, filename, original_name, file_size, mime_type, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $clientId,
+                    getCurrentUser()['id'],
+                    $filename,
+                    $file['name'], // original filename
+                    $file['size'],
+                    $file['type'], // mime type
+                    $description
+                ]);
+                
+                $newId = $pdo->lastInsertId();
+                sendResponse(['id' => $newId, 'success' => true, 'message' => 'Attachment uploaded successfully']);
+                
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to upload attachment: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'DELETE':
+            $attachmentId = $_GET['attachment_id'] ?? null;
+            if (!$attachmentId || !$clientId) {
+                sendResponse(['error' => 'Attachment ID and Client ID required'], 400);
+            }
+            
+            try {
+                // Get file info before deletion
+                $stmt = $pdo->prepare("SELECT filename FROM client_attachments WHERE id = ? AND client_id = ?");
+                $stmt->execute([$attachmentId, $clientId]);
+                $attachment = $stmt->fetch();
+                
+                if (!$attachment) {
+                    sendResponse(['error' => 'Attachment not found'], 404);
+                }
+                
+                // Get client name to construct file path
+                $stmt = $pdo->prepare("SELECT name FROM clients WHERE id = ?");
+                $stmt->execute([$clientId]);
+                $client = $stmt->fetch();
+                
+                if ($client) {
+                    $clientFolder = 'uploads/crm/' . preg_replace('/[^a-zA-Z0-9]/', '_', $client['name']);
+                    $filepath = $clientFolder . '/' . $attachment['filename'];
+                    
+                    // Delete physical file
+                    if (file_exists($filepath)) {
+                        unlink($filepath);
+                    }
+                }
+                
+                // Delete from database
+                $stmt = $pdo->prepare("DELETE FROM client_attachments WHERE id = ? AND client_id = ?");
+                $stmt->execute([$attachmentId, $clientId]);
+                
+                sendResponse(['success' => true, 'message' => 'Attachment deleted successfully']);
+                
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to delete attachment: ' . $e->getMessage()], 500);
+            }
+            break;
+    }
+}
+
+function handleCrmGroups($pdo, $method) {
+    switch ($method) {
+        case 'GET':
+            $stmt = $pdo->prepare("
+                SELECT g.*, u.name as created_by_name, COUNT(gm.client_id) as member_count
+                FROM client_groups g
+                LEFT JOIN users u ON g.created_by = u.id
+                LEFT JOIN client_group_members gm ON g.id = gm.group_id
+                GROUP BY g.id
+                ORDER BY g.name
+            ");
+            $stmt->execute();
+            sendResponse($stmt->fetchAll());
+            break;
+            
+        case 'POST':
+            $data = getRequestBody();
+            validateRequired($data, ['name']);
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO client_groups (name, description, created_by)
+                VALUES (?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? null,
+                getCurrentUser()['id']
+            ]);
+            
+            $newId = $pdo->lastInsertId();
+            sendResponse(['id' => $newId, 'success' => true, 'message' => 'Group created successfully']);
+            break;
+    }
+}
+
+// CRM Helper functions
+function getClientContacts($pdo, $clientId) {
+    $stmt = $pdo->prepare("SELECT * FROM client_contacts WHERE client_id = ? ORDER BY is_primary DESC, name");
+    $stmt->execute([$clientId]);
+    return $stmt->fetchAll();
+}
+
+function getClientActivities($pdo, $clientId) {
+    $stmt = $pdo->prepare("
+        SELECT a.*, u.name as user_name
+        FROM client_activities a
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.client_id = ?
+        ORDER BY a.activity_date DESC
+    ");
+    $stmt->execute([$clientId]);
+    return $stmt->fetchAll();
+}
+
+function getClientAttachments($pdo, $clientId) {
+    $stmt = $pdo->prepare("
+        SELECT a.*, u.name as uploaded_by_name
+        FROM client_attachments a
+        LEFT JOIN users u ON a.uploaded_by = u.id
+        WHERE a.client_id = ?
+        ORDER BY a.created_at DESC
+    ");
+    $stmt->execute([$clientId]);
+    return $stmt->fetchAll();
+}
+
+function getClientTodos($pdo, $clientId) {
+    $stmt = $pdo->prepare("
+        SELECT t.*, u.name as user_name
+        FROM client_todos t
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.client_id = ?
+        ORDER BY t.due_date ASC, t.priority DESC
+    ");
+    $stmt->execute([$clientId]);
+    return $stmt->fetchAll();
+}
+
+function getClientTasks($pdo, $clientId) {
+    $stmt = $pdo->prepare("
+        SELECT t.*, s.name as stage_name, b.name as board_name, u.name as user_name
+        FROM tasks t
+        LEFT JOIN stages s ON t.stage_id = s.id
+        LEFT JOIN boards b ON t.board_id = b.id
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.client_id = ? AND t.is_completed = FALSE
+        ORDER BY t.due_date ASC, t.priority DESC
+    ");
+    $stmt->execute([$clientId]);
+    return $stmt->fetchAll();
 }
 ?>

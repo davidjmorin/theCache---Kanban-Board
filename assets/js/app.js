@@ -43,6 +43,15 @@ class KanbanApp {
 
         if (this.currentUser) {
             this.startAutoRefresh();
+            
+            // Check for task parameter in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('task');
+            if (taskId) {
+                // Load board data first, then open the task
+                await this.loadBoardData();
+                await this.openTaskFromUrl(taskId);
+            }
         }
     }
 
@@ -349,6 +358,38 @@ class KanbanApp {
             this.showNotification('Error loading board data', 'error');
         } finally {
             this.hideLoading();
+        }
+    }
+
+    async openTaskFromUrl(taskId) {
+        try {
+            // Wait a moment for the board to fully render
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Find the task in the loaded data
+            const task = this.data.tasks.find(t => t.id == taskId);
+            if (task) {
+                // Open the task modal
+                this.showTaskModal(taskId);
+                this.showNotification(`Opened task: ${task.title}`, 'success');
+            } else {
+                // Task not found in current data, try to load it directly
+                try {
+                    const taskData = await this.apiCall(`tasks&id=${taskId}`);
+                    if (taskData) {
+                        this.showTaskModal(taskId);
+                        this.showNotification(`Opened task: ${taskData.title}`, 'success');
+                    } else {
+                        this.showNotification('Task not found', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error loading task:', error);
+                    this.showNotification('Task not found or access denied', 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error opening task from URL:', error);
+            this.showNotification('Error opening task', 'error');
         }
     }
 
