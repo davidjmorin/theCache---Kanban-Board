@@ -9,7 +9,13 @@ ini_set('session.use_strict_mode', 1);
 ini_set('session.cookie_samesite', 'Strict');
 ini_set('session.gc_maxlifetime', 3600); // 1 hour session timeout
 
+// Security headers
 header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: https:; font-src \'self\' https:; connect-src \'self\';');
 
 // CORS Configuration - Restrict to specific domains in production
 $allowedOrigins = [
@@ -203,7 +209,7 @@ function insertDefaultData($pdo) {
     }
 
     $defaultUsers = [
-        ['Admin User', 'admin@example.com', password_hash('admin123', PASSWORD_DEFAULT), true],
+        // Removed default admin account for security
         ['John Doe', 'john@example.com', password_hash('user123', PASSWORD_DEFAULT), false],
         ['Jane Smith', 'jane@example.com', password_hash('user123', PASSWORD_DEFAULT), false]
     ];
@@ -412,8 +418,18 @@ function runCrmMigrations($pdo) {
 
 function sendResponse($data, $status = 200) {
     http_response_code($status);
+    
+    // Sanitize error messages in production
+    if (isset($data['error']) && !isDevelopment()) {
+        $data['error'] = 'An error occurred. Please try again.';
+    }
+    
     echo json_encode($data);
     exit;
+}
+
+function isDevelopment() {
+    return defined('ENVIRONMENT') && ENVIRONMENT === 'development';
 }
 
 function generateCSRFToken() {
@@ -468,6 +484,26 @@ function createNotification($pdo, $userId, $taskId, $message, $type) {
     $stmt = $pdo->prepare("INSERT INTO notifications (user_id, task_id, message, type) VALUES (?, ?, ?, ?)");
     $stmt->execute([$userId, $taskId, $message, $type]);
     return $pdo->lastInsertId();
+}
+
+function checkRateLimit($pdo, $userId, $action, $limit = 5, $window = 300) {
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count 
+        FROM rate_limits 
+        WHERE user_id = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+    ");
+    $stmt->execute([$userId, $action, $window]);
+    $result = $stmt->fetch();
+    
+    if ($result['count'] >= $limit) {
+        return false; // Rate limit exceeded
+    }
+    
+    // Log this attempt
+    $stmt = $pdo->prepare("INSERT INTO rate_limits (user_id, action) VALUES (?, ?)");
+    $stmt->execute([$userId, $action]);
+    
+    return true; // Rate limit not exceeded
 }
 
 
