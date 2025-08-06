@@ -2,10 +2,34 @@
 // Set timezone to Eastern
 date_default_timezone_set('America/New_York');
 
+// Enhanced session security
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_secure', 0); // Set to 1 in production with HTTPS
+ini_set('session.use_strict_mode', 1);
+ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.gc_maxlifetime', 3600); // 1 hour session timeout
+
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+
+// CORS Configuration - Restrict to specific domains in production
+$allowedOrigins = [
+    'http://localhost:8000',
+    'http://localhost:3000',
+    'http://127.0.0.1:8000',
+    'http://127.0.0.1:3000'
+    // Add your production domain here: 'https://yourdomain.com'
+];
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+} else {
+    header('Access-Control-Allow-Origin: http://localhost:8000'); // Default fallback
+}
+
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
+header('Access-Control-Allow-Credentials: true');
 
 if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
@@ -392,6 +416,20 @@ function sendResponse($data, $status = 200) {
     exit;
 }
 
+function generateCSRFToken() {
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function validateCSRFToken($token) {
+    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        sendResponse(['error' => 'Invalid CSRF token'], 403);
+    }
+    return true;
+}
+
 function getRequestBody() {
     return json_decode(file_get_contents('php://input'), true);
 }
@@ -410,6 +448,20 @@ function validateRequired($data, $fields) {
     if (!empty($missing)) {
         sendResponse(['error' => 'Missing required fields: ' . implode(', ', $missing)], 400);
     }
+}
+
+function sanitizeInput($input) {
+    if (is_array($input)) {
+        return array_map('sanitizeInput', $input);
+    }
+    return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+}
+
+function sanitizeOutput($output) {
+    if (is_array($output)) {
+        return array_map('sanitizeOutput', $output);
+    }
+    return htmlspecialchars($output, ENT_QUOTES, 'UTF-8');
 }
 
 function createNotification($pdo, $userId, $taskId, $message, $type) {

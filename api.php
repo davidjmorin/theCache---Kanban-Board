@@ -240,15 +240,19 @@ function handleLogin($pdo, $method) {
     $_SESSION['user_name'] = $user['name'];
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['is_admin'] = (bool)$user['is_admin'];
+    
+    // Generate CSRF token for the session
+    $csrfToken = generateCSRFToken();
 
     sendResponse([
         'success' => true,
         'user' => [
             'id' => $user['id'],
-            'name' => $user['name'],
-            'email' => $user['email'],
+            'name' => sanitizeOutput($user['name']),
+            'email' => sanitizeOutput($user['email']),
             'is_admin' => (bool)$user['is_admin']
-        ]
+        ],
+        'csrf_token' => $csrfToken
     ]);
 }
 
@@ -259,6 +263,14 @@ function handleRegister($pdo, $method) {
 
     $data = getRequestBody();
     validateRequired($data, ['name', 'email', 'password']);
+    
+    // Sanitize input data
+    $data['name'] = sanitizeInput($data['name']);
+    $data['email'] = filter_var(trim($data['email']), FILTER_SANITIZE_EMAIL);
+    
+    if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        sendResponse(['error' => 'Invalid email format'], 400);
+    }
 
     $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$data['email']]);
@@ -266,8 +278,32 @@ function handleRegister($pdo, $method) {
         sendResponse(['error' => 'Email already registered'], 409);
     }
 
-    if (strlen($data['password']) < 6) {
-        sendResponse(['error' => 'Password must be at least 6 characters long'], 400);
+    // Enhanced password validation
+    $password = $data['password'];
+    $errors = [];
+    
+    if (strlen($password) < 8) {
+        $errors[] = 'Password must be at least 8 characters long';
+    }
+    
+    if (!preg_match('/[A-Z]/', $password)) {
+        $errors[] = 'Password must contain at least one uppercase letter';
+    }
+    
+    if (!preg_match('/[a-z]/', $password)) {
+        $errors[] = 'Password must contain at least one lowercase letter';
+    }
+    
+    if (!preg_match('/[0-9]/', $password)) {
+        $errors[] = 'Password must contain at least one number';
+    }
+    
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+        $errors[] = 'Password must contain at least one special character';
+    }
+    
+    if (!empty($errors)) {
+        sendResponse(['error' => 'Password requirements not met: ' . implode(', ', $errors)], 400);
     }
 
     $stmt = $pdo->prepare("INSERT INTO users (name, email, password, is_admin, is_active) VALUES (?, ?, ?, 0, 1)");
@@ -585,6 +621,23 @@ function handleTasks($pdo, $method, $id) {
             case 'POST':
                 $data = getRequestBody();
                 validateRequired($data, ['title', 'stage_id', 'board_id']);
+                
+                // Validate CSRF token for POST requests
+                $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+                if ($csrfToken) {
+                    validateCSRFToken($csrfToken);
+                }
+                
+                // Sanitize input data
+                $data['title'] = sanitizeInput($data['title']);
+                $data['description'] = sanitizeInput($data['description'] ?? '');
+                $data['stage_id'] = (int)$data['stage_id'];
+                $data['board_id'] = (int)$data['board_id'];
+                $data['user_id'] = isset($data['user_id']) ? (int)$data['user_id'] : null;
+                $data['client_id'] = isset($data['client_id']) ? (int)$data['client_id'] : null;
+                $data['priority'] = sanitizeInput($data['priority'] ?? 'medium');
+                $data['due_date'] = sanitizeInput($data['due_date'] ?? null);
+                $data['due_time'] = sanitizeInput($data['due_time'] ?? null);
 
                 $stmt = $pdo->prepare("
                     SELECT b.*, 
@@ -1293,7 +1346,36 @@ function handleAttachments($pdo, $method, $id) {
                 sendResponse(['error' => 'File upload failed'], 400);
             }
 
-            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+            // File upload security validation
+            $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx'];
+            $maxFileSize = 10 * 1024 * 1024; // 10MB
+            $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            
+            // Validate file type
+            if (!in_array($extension, $allowedTypes)) {
+                sendResponse(['error' => 'Invalid file type. Allowed types: ' . implode(', ', $allowedTypes)], 400);
+            }
+            
+            // Validate file size
+            if ($file['size'] > $maxFileSize) {
+                sendResponse(['error' => 'File too large. Maximum size: 10MB'], 400);
+            }
+            
+            // Validate MIME type
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+            
+            $allowedMimeTypes = [
+                'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+                'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ];
+            
+            if (!in_array($mimeType, $allowedMimeTypes)) {
+                sendResponse(['error' => 'Invalid file MIME type'], 400);
+            }
+            
             $filename = uniqid() . '.' . $extension;
             $uploadPath = 'uploads/' . $filename;
 
@@ -2863,6 +2945,21 @@ function handleCrmAttachments($pdo, $method, $clientId) {
 
                 if (!in_array($fileExtension, $allowedTypes)) {
                     sendResponse(['error' => 'File type not allowed'], 400);
+                }
+                
+                // Validate MIME type for additional security
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_file($finfo, $file['tmp_name']);
+                finfo_close($finfo);
+                
+                $allowedMimeTypes = [
+                    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+                    'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                ];
+                
+                if (!in_array($mimeType, $allowedMimeTypes)) {
+                    sendResponse(['error' => 'Invalid file MIME type'], 400);
                 }
 
                 $stmt = $pdo->prepare("SELECT name FROM clients WHERE id = ?");

@@ -26,6 +26,7 @@ class KanbanApp {
         this.noteEditor = null;
         this.notePopupEditor = null;
         this.descriptionPopupEditor = null;
+        this.csrfToken = null;
 
         this.init();
     }
@@ -71,6 +72,11 @@ class KanbanApp {
                     'Content-Type': 'application/json'
                 }
             };
+
+            // Add CSRF token to headers if available
+            if (this.csrfToken && method !== 'GET') {
+                options.headers['X-CSRF-Token'] = this.csrfToken;
+            }
 
             if (data && method !== 'GET') {
                 options.body = JSON.stringify(data);
@@ -219,6 +225,7 @@ class KanbanApp {
             });
 
             this.currentUser = response.user;
+            this.csrfToken = response.csrf_token;
             this.showApp();
             await this.loadBoardData();
             this.checkDueTasks();
@@ -243,6 +250,7 @@ class KanbanApp {
             });
 
             this.currentUser = response.user;
+            this.csrfToken = response.csrf_token;
             this.showApp();
             await this.loadBoardData();
             this.checkDueTasks();
@@ -268,6 +276,7 @@ class KanbanApp {
         try {
             await this.apiCall('logout', 'POST');
             this.currentUser = null;
+            this.csrfToken = null;
             this.data = {
                 company: null,
                 boards: [],
