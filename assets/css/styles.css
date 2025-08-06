@@ -3777,3 +3777,513 @@ div#userMenu {
 .note-text.markdown-content .emoji {
     font-size: 1em;
 }
+
+/* Modern Client Cards Layout */
+.client-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+    padding: 0.75rem;
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.client-cards::-webkit-scrollbar {
+    width: 6px;
+}
+
+.client-cards::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.client-cards::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+}
+
+.client-cards::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-secondary);
+}
+
+#clientTableContainer {
+    height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+.client-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.client-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
+}
+
+.client-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.client-company-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.client-company-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.125rem 0;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client-email {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client-card-details {
+    margin-bottom: 0.75rem;
+}
+
+.client-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.75rem;
+}
+
+.client-detail-row:last-child {
+    margin-bottom: 0;
+}
+
+.client-detail-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.client-detail-value {
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    font-weight: 400;
+    text-align: right;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client-card-actions {
+    display: flex;
+    gap: 0.375rem;
+    justify-content: flex-end;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.client-card-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    min-width: auto;
+    border-radius: 6px;
+}
+
+/* Modern Client type and status badges */
+.client-type,
+.client-status {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: capitalize;
+    white-space: nowrap;
+    letter-spacing: 0.025em;
+}
+
+.client-type.type-lead {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #92400e;
+}
+
+.client-type.type-prospect {
+    background: linear-gradient(135deg, #dbeafe, #93c5fd);
+    color: #1e40af;
+}
+
+.client-type.type-customer {
+    background: linear-gradient(135deg, #dcfce7, #86efac);
+    color: #166534;
+}
+
+.client-type.type-vendor {
+    background: linear-gradient(135deg, #f3e8ff, #c4b5fd);
+    color: #7c3aed;
+}
+
+.client-status.status-active {
+    background: linear-gradient(135deg, #dcfce7, #86efac);
+    color: #166534;
+}
+
+.client-status.status-lead {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #92400e;
+}
+
+.client-status.status-inactive {
+    background: linear-gradient(135deg, #fee2e2, #fca5a5);
+    color: #991b1b;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .client-cards {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+    
+    .client-card {
+        padding: 0.875rem;
+    }
+    
+    .client-card-header {
+        margin-bottom: 0.625rem;
+    }
+    
+    .client-avatar-initials {
+        width: 32px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+    
+    .client-company-name {
+        font-size: 0.875rem;
+    }
+    
+    .client-detail-row {
+        padding: 0.1875rem 0;
+    }
+}
+
+/* Modern CRM Sidebar */
+.crm-sidebar {
+    width: 350px;
+    background: var(--card-background);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.crm-sidebar .crm-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background-color);
+}
+
+.crm-sidebar .crm-header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: var(--text-primary);
+}
+
+.crm-sidebar .crm-header .btn {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+}
+
+.client-filters {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background-color);
+}
+
+.client-search {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+.client-search i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.client-search input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-background);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.client-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.client-list {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.client-list-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background-color);
+}
+
+.client-list-header h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.client-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.client-filters select {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--card-background);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.client-filters select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Responsive design for sidebar */
+@media (max-width: 768px) {
+    .crm-sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .crm-sidebar .crm-header {
+        padding: 0.75rem;
+    }
+    
+    .crm-sidebar .crm-header h1 {
+        font-size: 1.125rem;
+    }
+    
+    .client-filters {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .client-list-header {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+.client-people {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.client-people span {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.client-people i {
+    width: 14px;
+    color: var(--primary-color);
+}
+
+.client-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.client-meta span {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.client-meta i {
+    width: 14px;
+    color: var(--primary-color);
+}
+
+
+
+/* Modern Client Detail Header */
+.client-detail-header {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.client-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.client-title-section {
+    flex: 1;
+}
+
+.client-title-section h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem 0;
+    line-height: 1.2;
+}
+
+.client-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.client-header-main .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.client-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.client-info-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.info-card-header {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-card-header i {
+    color: var(--primary-color);
+    font-size: 0.875rem;
+}
+
+.info-card-header span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.info-card-content {
+    padding: 1rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item i {
+    width: 16px;
+    color: var(--primary-color);
+    font-size: 0.875rem;
+}
+
+.info-item span {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .client-header-main {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .client-title-section h2 {
+        font-size: 1.5rem;
+    }
+    
+    .client-info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

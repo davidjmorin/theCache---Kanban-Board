@@ -8,7 +8,7 @@
     <link rel="shortcut icon" type="image/png" href="assets/thecache_logo.png">
     <link rel="apple-touch-icon" href="assets/thecache_logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/styles.css?v4.7">
+    <link rel="stylesheet" href="assets/css/styles.css?v4.9">
     <style>
         .crm-container {
             display: flex;
@@ -17,7 +17,7 @@
         }
 
         .crm-sidebar {
-            width: 300px;
+            width: 350px;
             background: var(--card-background);
             border-right: 1px solid var(--border-color);
             display: flex;
@@ -96,6 +96,45 @@
             font-size: 0.875rem;
             background: var(--input-bg);
             color: var(--text-primary);
+        }
+
+        /* Contact grid view styles */
+        .table-container.grid-view table {
+            display: none;
+        }
+        
+        .table-container.grid-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+        }
+        
+        .table-container.grid-view .contact-card {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .table-container.grid-view .contact-card .contact-name {
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        .table-container.grid-view .contact-card .contact-info {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .table-container.grid-view .contact-card .contact-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: auto;
         }
 
         .client-search input:focus {
@@ -847,6 +886,78 @@
             color: white;
             border-color: var(--primary-color);
         }
+        .form-help {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .csv-mapping-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .mapping-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .mapping-row label {
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .mapping-row select {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--card-background);
+            color: var(--text-primary);
+        }
+
+        #csvPreview table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+
+        #csvPreview th,
+        #csvPreview td {
+            border: 1px solid var(--border-color);
+            padding: 0.25rem;
+            text-align: left;
+        }
+
+        #csvPreview th {
+            background: var(--background-color);
+            font-weight: 600;
+        }
+
+        .csv-import-progress {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--card-background);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: var(--background-color);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -854,10 +965,15 @@
         <!-- Sidebar -->
         <div class="crm-sidebar">
             <div class="crm-header">
-                <h1>CRM</h1>
-                <button class="btn btn-primary" onclick="showNewClientModal()">
-                    <i class="fas fa-plus"></i> New Client
-                </button>
+                <img src="assets/thecache_logo.png" alt="The Cache Logo" class="header-logo">
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-primary" onclick="crmApp.showNewClientModal()">
+                        <i class="fas fa-plus"></i> New Client
+                    </button>
+                    <button class="btn btn-secondary" onclick="crmApp.showCsvUploadModal()">
+                        <i class="fas fa-upload"></i> Import CSV
+                    </button>
+                </div>
             </div>
 
             <div class="client-filters" style="padding: 1rem;">
@@ -874,7 +990,6 @@
                         <select id="statusFilter" onchange="filterClients()">
                             <option value="">All Status</option>
                             <option value="active">Active</option>
-                            <option value="lead">Lead</option>
                             <option value="inactive">Inactive</option>
                         </select>
                         <select id="typeFilter" onchange="filterClients()">
@@ -927,12 +1042,12 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>New Client</h2>
-                <button class="btn btn-icon" onclick="hideNewClientModal()">
+                <button class="btn btn-icon" onclick="crmApp.hideNewClientModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <form id="newClientForm" onsubmit="createClient(event)">
+            <form id="newClientForm" onsubmit="crmApp.createClient(event)">
                 <div class="modal-body">
                     <div class="form-grid">
                         <div class="form-group">
@@ -1032,6 +1147,13 @@
                             <label for="classification">Classification</label>
                             <input type="text" id="classification" name="classification">
                         </div>
+
+                        <div class="form-group">
+                            <label for="accountManager">Account Manager</label>
+                            <select id="accountManager" name="account_manager_id">
+                                <option value="">Select Account Manager...</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -1041,7 +1163,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="hideNewClientModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideNewClientModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Client</button>
                 </div>
             </form>
@@ -1058,7 +1180,7 @@
                 </button>
             </div>
 
-            <form id="addActivityForm" onsubmit="addActivity(event)">
+            <form id="addActivityForm" onsubmit="crmApp.submitActivity(event)" data-client-id="" data-activity-id="">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="activityTitle">Title <span class="required">*</span></label>
@@ -1085,7 +1207,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="hideAddActivityModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddActivityModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Activity</button>
                 </div>
             </form>
@@ -1102,7 +1224,7 @@
                 </button>
             </div>
 
-            <form id="addContactForm" onsubmit="addContact(event)">
+            <form id="addContactForm" onsubmit="crmApp.submitContact(event)" data-client-id="">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="contactName">Name <span class="required">*</span></label>
@@ -1145,7 +1267,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="hideAddContactModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddContactModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Contact</button>
                 </div>
             </form>
@@ -1162,7 +1284,7 @@
                 </button>
             </div>
 
-            <form id="addTodoForm" onsubmit="addTodo(event)">
+            <form id="addTodoForm" onsubmit="crmApp.submitTodo(event)" data-client-id="">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="todoTitle">Title <span class="required">*</span></label>
@@ -1197,14 +1319,16 @@
                         <label for="todoStatus">Status</label>
                         <select id="todoStatus" name="status">
                             <option value="pending" selected>Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
                             <option value="closed">Closed</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="hideAddTodoModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add To-Do</button>
+                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddTodoModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Todo</button>
                 </div>
             </form>
         </div>
@@ -1319,6 +1443,13 @@
                         <div class="form-group">
                             <label for="editClassification">Classification</label>
                             <input type="text" id="editClassification" name="classification">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editAccountManager">Account Manager</label>
+                            <select id="editAccountManager" name="account_manager_id">
+                                <option value="">Select Account Manager...</option>
+                            </select>
                         </div>
                     </div>
 
@@ -1559,6 +1690,132 @@
         </div>
     </div>
 
+    <!-- New Client Modal -->
+    <div id="newClientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Client</h2>
+                <button class="btn btn-icon" onclick="hideNewClientModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="newClientForm" onsubmit="crmApp.createClient(event)">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="clientName">Company Name <span class="required">*</span></label>
+                            <input type="text" id="clientName" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientEmail">Email <span class="required">*</span></label>
+                            <input type="email" id="clientEmail" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientType">Company Type</label>
+                            <select id="clientType" name="company_type">
+                                <option value="lead">Lead</option>
+                                <option value="customer">Customer</option>
+                                <option value="prospect">Prospect</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientStatus">Status</label>
+                            <select id="clientStatus" name="status">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientCategory">Category</label>
+                            <select id="clientCategory" name="company_category">
+                                <option value="Standard">Standard</option>
+                                <option value="Premium">Premium</option>
+                                <option value="Enterprise">Enterprise</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientNumber">Company Number</label>
+                            <input type="text" id="clientNumber" name="company_number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="contactName">Contact Name</label>
+                            <input type="text" id="contactName" name="contact_name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="contactNumber">Contact Number</label>
+                            <input type="tel" id="contactNumber" name="contact_number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="alternatePhone">Alternate Phone</label>
+                            <input type="tel" id="alternatePhone" name="alternate_phone">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientUrl">Website URL</label>
+                            <input type="url" id="clientUrl" name="url">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientAddress1">Address 1</label>
+                        <input type="text" id="clientAddress1" name="address_1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientAddress2">Address 2</label>
+                        <input type="text" id="clientAddress2" name="address_2">
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="clientCity">City</label>
+                            <input type="text" id="clientCity" name="city">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientState">State</label>
+                            <input type="text" id="clientState" name="state">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientZipCode">Zip Code</label>
+                            <input type="text" id="clientZipCode" name="zip_code">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientCountry">Country</label>
+                            <input type="text" id="clientCountry" name="country" value="United States">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientClassification">Classification</label>
+                            <input type="text" id="clientClassification" name="classification">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientNotes">Notes</label>
+                        <textarea id="clientNotes" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideNewClientModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Client</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- View Contact Modal -->
     <div id="viewContactModal" class="modal">
         <div class="modal-content">
@@ -1616,6 +1873,115 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="hideViewContactModal()">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- CSV Upload Modal -->
+    <div id="csvUploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Clients from CSV</h2>
+                <button class="btn btn-icon" onclick="crmApp.hideCsvUploadModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="csvUploadForm" onsubmit="crmApp.submitCsvUpload(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="csvFile">Select CSV File <span class="required">*</span></label>
+                        <input type="file" id="csvFile" name="csv_file" accept=".csv" required>
+                        <small class="form-help">Upload a CSV file with client data. Maximum file size: 10MB</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="csvMapping">Column Mapping</label>
+                        <div id="csvMappingContainer" style="display: none;">
+                            <div class="csv-mapping-grid">
+                                <div class="mapping-row">
+                                    <label>Company Name:</label>
+                                    <select id="mapCompanyName" name="map_company_name">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Email:</label>
+                                    <select id="mapEmail" name="map_email">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Phone:</label>
+                                    <select id="mapPhone" name="map_phone">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Website:</label>
+                                    <select id="mapWebsite" name="map_website">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Address:</label>
+                                    <select id="mapAddress" name="map_address">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>City:</label>
+                                    <select id="mapCity" name="map_city">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>State:</label>
+                                    <select id="mapState" name="map_state">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Zip Code:</label>
+                                    <select id="mapZipCode" name="map_zip_code">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Classification:</label>
+                                    <select id="mapClassification" name="map_classification">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                                <div class="mapping-row">
+                                    <label>Company Type:</label>
+                                    <select id="mapCompanyType" name="map_company_type">
+                                        <option value="">Select column...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="csvPreview">Data Preview</label>
+                        <div id="csvPreview" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 0.5rem; background: var(--background-color);">
+                            <p style="color: var(--text-secondary); text-align: center;">Upload a CSV file to see preview</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="skipFirstRow" name="skip_first_row" checked>
+                            Skip first row (headers)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideCsvUploadModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import Clients</button>
+                </div>
+            </form>
         </div>
     </div>
 

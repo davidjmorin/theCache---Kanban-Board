@@ -185,8 +185,14 @@ switch ($endpoint) {
             sendResponse(['error' => 'Board ID or Task ID required']);
         }
         break;
+    case 'crm-csv-import':
+        handleCrmCsvImport();
+        break;
+    case 'crm-users':
+        handleCrmUsers($pdo, $method);
+        break;
     default:
-        sendResponse(['error' => 'Endpoint not found: ' . $endpoint], 404);
+        sendResponse(['error' => 'Endpoint not found'], 404);
 }
 
 function requireAuth() {
@@ -2346,8 +2352,20 @@ function handleCrmClients($pdo, $method) {
                     $params[] = "%$search%";
                 }
 
-                $sql = "SELECT c.id, c.name, c.email 
-                        FROM clients c";
+                if ($status) {
+                    $where[] = "c.status = ?";
+                    $params[] = $status;
+                }
+
+                if ($type) {
+                    $where[] = "c.company_type = ?";
+                    $params[] = $type;
+                }
+
+                $sql = "SELECT c.id, c.name, c.email, c.company_type, c.status, c.contact_name,
+                               u.name as account_manager_name
+                        FROM clients c
+                        LEFT JOIN users u ON c.account_manager_id = u.id";
 
                 if (!empty($where)) {
                     $sql .= " WHERE " . implode(" AND ", $where);
@@ -2417,8 +2435,10 @@ function handleCrmClient($pdo, $method, $id) {
                 $stmt = $pdo->prepare("
                     SELECT c.id, c.name, c.email, c.company_type, c.status, c.company_category, 
                            c.contact_number, c.address_1, c.address_2, c.city, c.state, c.zip_code, 
-                           c.country, c.classification, c.notes, c.created_at, c.updated_at
+                           c.country, c.classification, c.notes, c.created_at, c.updated_at,
+                           c.account_manager_id, u.name as account_manager_name
                     FROM clients c 
+                    LEFT JOIN users u ON c.account_manager_id = u.id
                     WHERE c.id = ?
                 ");
                 $stmt->execute([$id]);
@@ -3038,5 +3058,186 @@ function getClientTasks($pdo, $clientId) {
     ");
     $stmt->execute([$clientId]);
     return $stmt->fetchAll();
+}
+
+function handleCrmCsvImport() {
+    global $pdo;
+    
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendResponse(['error' => 'Method not allowed'], 405);
+        return;
+    }
+
+    try {
+        // Debug: Log received data
+        error_log('CSV Import - POST data: ' . print_r($_POST, true));
+        error_log('CSV Import - FILES data: ' . print_r($_FILES, true));
+        
+        // Check if file was uploaded
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            sendResponse(['error' => 'No CSV file uploaded or upload error'], 400);
+            return;
+        }
+
+        $file = $_FILES['csv_file'];
+        
+        // Validate file type
+        $allowedTypes = ['text/csv', 'text/plain', 'application/csv'];
+        if (!in_array($file['type'], $allowedTypes) && !str_ends_with($file['name'], '.csv')) {
+            sendResponse(['error' => 'Invalid file type. Please upload a CSV file.'], 400);
+            return;
+        }
+
+        // Validate file size (10MB max)
+        if ($file['size'] > 10 * 1024 * 1024) {
+            sendResponse(['error' => 'File size must be less than 10MB'], 400);
+            return;
+        }
+
+        // Read CSV file
+        $csvContent = file_get_contents($file['tmp_name']);
+        if ($csvContent === false) {
+            sendResponse(['error' => 'Failed to read CSV file'], 500);
+            return;
+        }
+
+        // Parse CSV
+        $lines = explode("\n", $csvContent);
+        $lines = array_filter($lines, function($line) {
+            return trim($line) !== '';
+        });
+
+        if (empty($lines)) {
+            sendResponse(['error' => 'CSV file is empty'], 400);
+            return;
+        }
+
+        // Get mapping from form data
+        $mappings = [
+            'company_name' => $_POST['map_company_name'] ?? null,
+            'email' => $_POST['map_email'] ?? null,
+            'phone' => $_POST['map_phone'] ?? null,
+            'website' => $_POST['map_website'] ?? null,
+            'address' => $_POST['map_address'] ?? null,
+            'city' => $_POST['map_city'] ?? null,
+            'state' => $_POST['map_state'] ?? null,
+            'zip_code' => $_POST['map_zip_code'] ?? null,
+            'classification' => $_POST['map_classification'] ?? null,
+            'company_type' => $_POST['map_company_type'] ?? null,
+        ];
+
+        // Debug: Log mappings
+        error_log('CSV Import - Mappings: ' . print_r($mappings, true));
+
+        // Validate required mapping
+        if (!$mappings['company_name']) {
+            error_log('CSV Import - Company name mapping is missing');
+            sendResponse(['error' => 'Company name mapping is required'], 400);
+            return;
+        }
+
+        $skipFirstRow = isset($_POST['skip_first_row']) && $_POST['skip_first_row'] === '1';
+        $startIndex = $skipFirstRow ? 1 : 0;
+
+        $importedCount = 0;
+        $errors = [];
+
+        // Begin transaction
+        $pdo->beginTransaction();
+
+        try {
+            for ($i = $startIndex; $i < count($lines); $i++) {
+                $line = $lines[$i];
+                $row = str_getcsv($line);
+                
+                if (count($row) < 1) continue;
+
+                // Extract data based on mappings
+                $clientData = [
+                    'name' => $mappings['company_name'] !== null ? trim($row[$mappings['company_name']]) : '',
+                    'email' => $mappings['email'] !== null ? trim($row[$mappings['email']]) : '',
+                    'contact_number' => $mappings['phone'] !== null ? trim($row[$mappings['phone']]) : '',
+                    'url' => $mappings['website'] !== null ? trim($row[$mappings['website']]) : '',
+                    'address_1' => $mappings['address'] !== null ? trim($row[$mappings['address']]) : '',
+                    'city' => $mappings['city'] !== null ? trim($row[$mappings['city']]) : '',
+                    'state' => $mappings['state'] !== null ? trim($row[$mappings['state']]) : '',
+                    'zip_code' => $mappings['zip_code'] !== null ? trim($row[$mappings['zip_code']]) : '',
+                    'classification' => $mappings['classification'] !== null ? trim($row[$mappings['classification']]) : '',
+                    'company_type' => $mappings['company_type'] !== null ? trim($row[$mappings['company_type']]) : 'customer',
+                ];
+
+                // Validate required fields
+                if (empty($clientData['name'])) {
+                    $errors[] = "Row " . ($i + 1) . ": Company name is required";
+                    continue;
+                }
+
+                // Set default values
+                $clientData['status'] = 'active';
+                $clientData['company_category'] = 'Standard';
+                $clientData['country'] = 'United States';
+
+                // Insert client
+                $stmt = $pdo->prepare("
+                    INSERT INTO clients (
+                        name, email, contact_number, url, address_1, city, state, 
+                        zip_code, classification, company_type, status, company_category, 
+                        country, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+
+                $stmt->execute([
+                    $clientData['name'],
+                    $clientData['email'] ?: null,
+                    $clientData['contact_number'] ?: null,
+                    $clientData['url'] ?: null,
+                    $clientData['address_1'] ?: null,
+                    $clientData['city'] ?: null,
+                    $clientData['state'] ?: null,
+                    $clientData['zip_code'] ?: null,
+                    $clientData['classification'] ?: null,
+                    $clientData['company_type'] ?: 'customer',
+                    $clientData['status'],
+                    $clientData['company_category'],
+                    $clientData['country'],
+                    getCurrentUser()['id']
+                ]);
+
+                $importedCount++;
+            }
+
+            // Commit transaction
+            $pdo->commit();
+
+            sendResponse([
+                'success' => true,
+                'imported_count' => $importedCount,
+                'errors' => $errors
+            ]);
+
+        } catch (Exception $e) {
+            // Rollback transaction
+            $pdo->rollBack();
+            sendResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+
+    } catch (Exception $e) {
+        sendResponse(['error' => 'Error processing CSV: ' . $e->getMessage()], 500);
+    }
+}
+
+function handleCrmUsers($pdo, $method) {
+    if ($method !== 'GET') {
+        sendResponse(['error' => 'Method not allowed'], 405);
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT id, name, email FROM users WHERE is_active = 1 ORDER BY name");
+        $stmt->execute();
+        $users = $stmt->fetchAll();
+        sendResponse($users);
+    } catch (Exception $e) {
+        sendResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
+    }
 }
 ?>

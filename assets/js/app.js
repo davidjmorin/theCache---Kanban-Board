@@ -47,6 +47,14 @@ class KanbanApp {
             // Check for task parameter in URL
             const urlParams = new URLSearchParams(window.location.search);
             const taskId = urlParams.get('task');
+            const clientId = urlParams.get('client');
+            
+            // Store client ID if provided in URL
+            if (clientId) {
+                this.pendingClientId = clientId;
+                console.log('Client ID from URL:', clientId);
+            }
+            
             if (taskId) {
                 // Load board data first, then open the task
                 await this.loadBoardData();
@@ -478,7 +486,9 @@ class KanbanApp {
                     ${completedCount > 0 ? `<span class="stage-completed-count">${completedCount} done</span>` : ''}
                 </div>
                 <div class="stage-actions">
-
+                    <button class="btn-icon" onclick="app.addTaskToStage(${stage.id})" title="Add Task to ${stage.name}">
+                        <i class="fas fa-plus"></i>
+                    </button>
                     <button class="btn-icon" onclick="app.deleteStage(${stage.id})" title="Delete Stage">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -1156,6 +1166,15 @@ class KanbanApp {
         if (callRadio) {
             callRadio.checked = true;
         }
+        
+        // Set client if we have a pending client ID from URL
+        if (this.pendingClientId) {
+            const clientSelect = document.getElementById('taskClient');
+            if (clientSelect) {
+                clientSelect.value = this.pendingClientId;
+                console.log('Set client ID from URL in clearTaskModal:', this.pendingClientId);
+            }
+        }
     }
 
     showCompanyModal() {
@@ -1248,6 +1267,22 @@ class KanbanApp {
         }
     }
 
+    addTaskToStage(stageId) {
+        // Store the stage ID to set after modal is populated
+        this.pendingStageId = stageId;
+        
+        // Show the task modal
+        this.showTaskModal();
+        
+        // Focus on the title field for better UX
+        setTimeout(() => {
+            const titleInput = document.getElementById('taskTitle');
+            if (titleInput) {
+                titleInput.focus();
+            }
+        }, 100);
+    }
+
     showTaskModal(taskId = null) {
         if (taskId) {
             this.loadTaskForEdit(taskId);
@@ -1255,9 +1290,28 @@ class KanbanApp {
         } else {
             document.getElementById('taskModalTitle').textContent = 'Add Task';
             this.clearTaskModal();
+            
+            // Set client if we have a pending client ID from URL
+            if (this.pendingClientId) {
+                const clientSelect = document.getElementById('taskClient');
+                if (clientSelect) {
+                    clientSelect.value = this.pendingClientId;
+                    console.log('Set client ID from URL:', this.pendingClientId);
+                }
+            }
         }
 
         this.populateSelectOptions();
+
+        // Set stage if we have a pending stage ID
+        if (this.pendingStageId) {
+            const stageSelect = document.getElementById('taskStage');
+            if (stageSelect) {
+                stageSelect.value = this.pendingStageId;
+                console.log('Set stage ID from pending:', this.pendingStageId);
+                this.pendingStageId = null; // Clear after setting
+            }
+        }
 
         this.showModal('taskModal');
     }
@@ -1521,6 +1575,15 @@ class KanbanApp {
             await this.loadBoardData();
             this.renderBoard();
             this.hideModal('taskModal');
+            
+            // Clear pending client ID after task creation
+            if (this.pendingClientId) {
+                this.pendingClientId = null;
+                // Remove client parameter from URL
+                const url = new URL(window.location);
+                url.searchParams.delete('client');
+                window.history.replaceState({}, '', url);
+            }
         } catch (error) {
         }
     }

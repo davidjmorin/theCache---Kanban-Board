@@ -33,6 +33,7 @@ try {
         WHERE t.due_date IS NOT NULL 
         AND t.user_id IS NOT NULL
         AND (t.due_date <= ? OR t.due_date <= DATE_ADD(?, INTERVAL 7 DAY))
+        AND t.is_completed = 0
         ORDER BY t.due_date ASC
     ");
     $stmt->execute([$today, $today]);
