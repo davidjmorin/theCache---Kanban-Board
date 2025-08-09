@@ -75,17 +75,17 @@
                     </div>
                 </div>
                 
-                <div class="header-nav desktop-only">
-                    <button class="btn btn-secondary" onclick="window.location.href='/kanban.html'">
+                <div class="header-nav desktop-only" id="headerNav">
+                    <button class="btn btn-secondary" data-module="kanban" onclick="window.location.href='/kanban.html'">
                         <i class="fas fa-columns"></i> Tasks
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/crm'">
+                    <button class="btn btn-secondary" data-module="crm" onclick="window.location.href='/crm'">
                         <i class="fas fa-users"></i> CRM
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/notes'">
+                    <button class="btn btn-secondary" data-module="notes" onclick="window.location.href='/notes'">
                         <i class="fas fa-sticky-note"></i> Notes
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/calendar'">
+                    <button class="btn btn-secondary" data-module="calendar" onclick="window.location.href='/calendar'">
                         <i class="fas fa-calendar"></i> Calendar
                     </button>
                 </div>
@@ -102,6 +102,9 @@
                                 <span id="userDropdownName">User</span>
                             </div>
                             <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" onclick="window.location.href='/preferences'">
+                                <i class="fas fa-cog"></i> Preferences
+                            </button>
                             <button class="dropdown-item" id="logoutBtn">
                                 <i class="fas fa-sign-out-alt"></i> Logout
                             </button>
@@ -148,7 +151,7 @@
                     </div>
                 </div>
 
-                <div class="metric-card">
+                <div class="metric-card" data-crm-section="clients">
                     <div class="metric-icon clients-icon">
                         <i class="fas fa-building"></i>
                     </div>
@@ -195,7 +198,7 @@
             </div>
 
             <!-- Opportunity Statistics Section -->
-            <div class="section-header">
+            <div class="section-header" data-crm-section="opportunities">
                 <div class="section-icon">
                     <i class="fas fa-handshake"></i>
                 </div>
@@ -205,7 +208,7 @@
                 </div>
             </div>
 
-            <div class="metrics-grid opportunities-grid">
+            <div class="metrics-grid opportunities-grid" data-crm-section="opportunities">
                 <div class="metric-card opportunity-card">
                     <div class="metric-icon won-icon">
                         <i class="fas fa-trophy"></i>
@@ -336,7 +339,7 @@
                                 <i class="fas fa-arrow-right"></i>
                             </div>
                         </div>
-                        <div class="quick-action-item" onclick="window.location.href='/crm'">
+                        <div class="quick-action-item" data-crm-section="quick-action" onclick="window.location.href='/crm'">
                             <div class="quick-action-icon">
                                 <i class="fas fa-building"></i>
                             </div>
@@ -354,7 +357,7 @@
             </div>
 
             <!-- Upcoming TBR Meetings Section -->
-            <div class="overview-card tbr-section">
+            <div class="overview-card tbr-section" data-crm-section="tbr">
                 <div class="overview-header">
                     <div class="overview-icon">
                         <i class="fas fa-calendar-check"></i>

@@ -100,14 +100,14 @@
                     </button>
                 </div>
                 
-                <div class="header-nav desktop-only">
-                    <button class="btn btn-secondary" onclick="window.location.href='/crm'">
+                <div class="header-nav desktop-only" id="headerNav">
+                    <button class="btn btn-secondary" data-module="crm" onclick="window.location.href='/crm'">
                         <i class="fas fa-users"></i> CRM
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/notes'">
+                    <button class="btn btn-secondary" data-module="notes" onclick="window.location.href='/notes'">
                         <i class="fas fa-sticky-note"></i> Notes
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/calendar'">
+                    <button class="btn btn-secondary" data-module="calendar" onclick="window.location.href='/calendar'">
                         <i class="fas fa-calendar"></i> Calendar
                     </button>
                     
@@ -145,6 +145,9 @@
                                 <span id="userDropdownName">User</span>
                             </div>
                             <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" onclick="window.location.href='/preferences'">
+                                <i class="fas fa-cog"></i> Preferences
+                            </button>
                             <button class="dropdown-item" id="logoutBtn">
                                 <i class="fas fa-sign-out-alt"></i> Logout
                             </button>

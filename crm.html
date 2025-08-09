@@ -1290,13 +1290,35 @@
         <div class="crm-main">
             <div class="crm-header">
                 <h1 id="mainTitle">Client Management</h1>
-                <div class="crm-header-actions">
-                    <button class="btn btn-secondary" onclick="goToKanban()">
-                        <i class="fas fa-tasks"></i> Kanban Board
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='notes.html'">
-                        <i class="fas fa-sticky-note"></i> Notes
-                    </button>
+                <div class="crm-header-actions" style="display: flex; gap: 1rem; align-items: center;">
+                    <div id="headerNav" style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn btn-secondary" data-module="kanban" onclick="goToKanban()">
+                            <i class="fas fa-tasks"></i> Kanban Board
+                        </button>
+                        <button class="btn btn-secondary" data-module="notes" onclick="window.location.href='notes.html'">
+                            <i class="fas fa-sticky-note"></i> Notes
+                        </button>
+                    </div>
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" id="userDropdown">
+                            <span id="currentUserName">User</span> <i class="fas fa-user"></i>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="userMenu">
+                            <div class="dropdown-header">
+                                <i class="fas fa-user"></i>
+                                <span id="userDropdownName">User</span>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" onclick="window.location.href='/preferences'">
+                                <i class="fas fa-cog"></i> Preferences
+                            </button>
+                            <button class="dropdown-item" onclick="crmApp.logout()">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

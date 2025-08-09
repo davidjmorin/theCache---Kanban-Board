@@ -4,14 +4,18 @@ class CRMApp {
         this.currentClient = null;
         this.clients = [];
         this.currentUser = null;
+        this.userPreferences = {};
         this.init();
     }
 
     async init() {
         await this.checkAuthentication();
+        await this.loadUserPreferences();
+        this.updateNavigationVisibility();
         await this.loadClients();
         await this.loadUsers();
         this.setupEventListeners();
+        this.setupDropdowns();
         
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client');
@@ -47,6 +51,7 @@ class CRMApp {
             const response = await this.apiCall('check-auth');
             if (response.authenticated) {
                 this.currentUser = response.user;
+                this.updateUserDisplay();
             } else {
                 window.location.href = '/kanban.html';
             }
@@ -4286,6 +4291,89 @@ class CRMApp {
         } catch (error) {
             console.error('Failed to delete attachment:', error);
             this.showNotification('Failed to delete attachment: ' + error.message, 'error');
+        }
+    }
+
+    updateUserDisplay() {
+        if (this.currentUser) {
+            const userName = this.currentUser.name || 'User';
+            const currentUserNameEl = document.getElementById('currentUserName');
+            const userDropdownNameEl = document.getElementById('userDropdownName');
+            
+            if (currentUserNameEl) {
+                currentUserNameEl.textContent = userName;
+            }
+            if (userDropdownNameEl) {
+                userDropdownNameEl.textContent = userName;
+            }
+        }
+    }
+
+    setupDropdowns() {
+        const userDropdown = document.getElementById('userDropdown');
+        const userMenu = document.getElementById('userMenu');
+
+        if (userDropdown) {
+            userDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userDropdown.parentElement.classList.toggle('active');
+            });
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                });
+            }
+        });
+
+        // Close dropdowns on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                });
+            }
+        });
+    }
+
+    async loadUserPreferences() {
+        try {
+            const response = await this.apiCall('user-preferences');
+            this.userPreferences = response || {};
+        } catch (error) {
+            console.error('Failed to load user preferences:', error);
+            this.userPreferences = {};
+        }
+    }
+
+    updateNavigationVisibility() {
+        const headerNav = document.getElementById('headerNav');
+        if (!headerNav) return;
+
+        const navButtons = headerNav.querySelectorAll('[data-module]');
+        navButtons.forEach(button => {
+            const module = button.getAttribute('data-module');
+            const isEnabled = this.userPreferences[module] !== 0 && this.userPreferences[module] !== false; // Default to enabled unless explicitly disabled (0 or false)
+            
+            if (isEnabled) {
+                button.style.display = '';
+            } else {
+                button.style.display = 'none';
+            }
+        });
+    }
+
+    async logout() {
+        try {
+            await this.apiCall('logout', 'POST');
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if logout API fails, redirect to login
+            window.location.href = '/';
         }
     }
 }

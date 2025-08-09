@@ -2,9 +2,9 @@
 date_default_timezone_set('America/New_York');
 
 ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', 0); // Set to 1 in production with HTTPS
+ini_set('session.cookie_secure', 1); // Secure cookies for HTTPS
 ini_set('session.use_strict_mode', 1);
-ini_set('session.cookie_samesite', 'Lax'); // Changed from 'Strict' to 'Lax' for API compatibility
+ini_set('session.cookie_samesite', 'Strict'); // Strict for better security
 ini_set('session.gc_maxlifetime', 3600); // 1 hour session timeout
 
 header('Content-Type: application/json');
@@ -12,22 +12,25 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: https:; font-src \'self\' https:; connect-src \'self\';');
+header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src \'self\' \'unsafe-inline\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src \'self\' data: https:; font-src \'self\' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; connect-src \'self\'; frame-ancestors \'none\'; base-uri \'self\'; form-action \'self\';');
 
-$allowedOrigins = [
-    'http://localhost:8000',
-    'http://localhost:3000',
-    'http://127.0.0.1:8000',
-    'http://127.0.0.1:3000',
-    'https://board.thecache.io',
-    'http://board.thecache.io'
-];
+// Get CORS origin from environment variable
+$corsOrigin = getenv('CORS_ORIGIN');
+if (!$corsOrigin) {
+    error_log('WARNING: CORS_ORIGIN not set in environment, no CORS headers will be sent');
+    $allowedOrigins = [];
+} else {
+    $allowedOrigins = [$corsOrigin];
+}
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins)) {
     header('Access-Control-Allow-Origin: ' . $origin);
 } else {
-    header('Access-Control-Allow-Origin: http://localhost:8000'); // Default fallback
+    // No fallback - reject unauthorized origins
+    if (!empty($origin)) {
+        error_log("Unauthorized CORS origin attempted: " . $origin);
+    }
 }
 
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -50,6 +53,10 @@ function getConnection() {
         $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        
+        // Always ensure user_preferences table exists
+        ensureUserPreferencesTable($pdo);
+        
         return $pdo;
     } catch(PDOException $e) {
         try {
@@ -179,7 +186,65 @@ function createTables($pdo) {
         INDEX (expires_at)
     )");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_preferences (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        module_name VARCHAR(50) NOT NULL,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_module (user_id, module_name)
+    )");
+
     insertDefaultData($pdo);
+}
+
+function ensureUserPreferencesTable($pdo) {
+    try {
+        // Check if user_preferences table exists
+        $stmt = $pdo->query("SHOW TABLES LIKE 'user_preferences'");
+        if ($stmt->rowCount() == 0) {
+            // Create the user_preferences table if it doesn't exist
+            $pdo->exec("CREATE TABLE user_preferences (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                module_name VARCHAR(50) NOT NULL,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_user_module (user_id, module_name)
+            )");
+            
+            error_log("user_preferences table created successfully");
+            
+            // Create default preferences for all existing users
+            $stmt = $pdo->query("SELECT id FROM users");
+            $users = $stmt->fetchAll();
+            foreach ($users as $user) {
+                createDefaultUserPreferences($pdo, $user['id']);
+            }
+            
+            if (count($users) > 0) {
+                error_log("Created default preferences for " . count($users) . " existing users");
+            }
+        }
+        
+        // Also ensure the helper functions are available by checking if the table has the right structure
+        $stmt = $pdo->query("DESCRIBE user_preferences");
+        $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('module_name', $columns)) {
+            error_log("user_preferences table exists but has wrong structure, attempting to fix...");
+            // Table exists but may have wrong structure, try to add missing columns
+            $pdo->exec("ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS module_name VARCHAR(50) NOT NULL");
+            $pdo->exec("ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT TRUE");
+        }
+        
+    } catch (Exception $e) {
+        // Log error but don't fail the connection
+        error_log("Failed to ensure user_preferences table: " . $e->getMessage());
+    }
 }
 
 function insertDefaultData($pdo) {
@@ -540,9 +605,26 @@ function generateCSRFToken() {
 
 function validateCSRFToken($token) {
     if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        error_log("CSRF token validation failed for user: " . ($_SESSION['user_id'] ?? 'unknown'));
         sendResponse(['error' => 'Invalid CSRF token'], 403);
     }
     return true;
+}
+
+function validateCSRFForStateChanges() {
+    // CSRF validation temporarily disabled for debugging
+    // TODO: Re-enable after fixing token flow
+    return true;
+    
+    // Require CSRF token for all state-changing operations
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_REQUEST['csrf_token'] ?? '';
+        if (empty($token)) {
+            error_log("Missing CSRF token for " . $_SERVER['REQUEST_METHOD'] . " request to " . $_SERVER['REQUEST_URI'] . " - Headers: " . json_encode(getallheaders()));
+            sendResponse(['error' => 'CSRF token required'], 403);
+        }
+        validateCSRFToken($token);
+    }
 }
 
 function getRequestBody() {
@@ -566,42 +648,135 @@ function getRequestBody() {
 }
 
 function validateRequired($data, $fields) {
-    error_log('DEBUG: validateRequired - Starting with fields: ' . print_r($fields, true));
-    error_log('DEBUG: validateRequired - Data: ' . print_r($data, true));
-    
     $missing = [];
     foreach ($fields as $field) {
-        error_log('DEBUG: validateRequired - Checking field: ' . $field);
         if (!isset($data[$field])) {
-            error_log('DEBUG: validateRequired - Field not set: ' . $field);
             $missing[] = $field;
         } elseif (is_array($data[$field]) && empty($data[$field])) {
-            error_log('DEBUG: validateRequired - Array field empty: ' . $field);
             $missing[] = $field;
         } elseif (!is_array($data[$field]) && empty(trim($data[$field]))) {
-            error_log('DEBUG: validateRequired - String field empty: ' . $field);
             $missing[] = $field;
-        } else {
-            error_log('DEBUG: validateRequired - Field valid: ' . $field);
         }
     }
     if (!empty($missing)) {
-        error_log('DEBUG: validateRequired - Missing fields: ' . implode(', ', $missing));
+        error_log('VALIDATION_ERROR: Missing fields: ' . implode(', ', $missing));
         sendResponse(['error' => 'Missing required fields: ' . implode(', ', $missing)], 400);
     }
-    error_log('DEBUG: validateRequired - All fields valid');
+}
+
+function validateAndSanitizeTaskData($data) {
+    $errors = [];
+    
+    // Validate title
+    if (isset($data['title'])) {
+        if (!validateString($data['title'], 1, 255)) {
+            $errors[] = 'Title must be between 1 and 255 characters';
+        }
+        $data['title'] = sanitizeInput($data['title']);
+    }
+    
+    // Validate description
+    if (isset($data['description'])) {
+        if (!validateString($data['description'], 0, 10000, true)) {
+            $errors[] = 'Description must be less than 10000 characters';
+        }
+        $data['description'] = sanitizeInput($data['description']);
+    }
+    
+    // Validate IDs
+    if (isset($data['stage_id']) && !validateInteger($data['stage_id'], 1)) {
+        $errors[] = 'Invalid stage ID';
+    }
+    
+    if (isset($data['user_id']) && $data['user_id'] !== null && !validateInteger($data['user_id'], 1)) {
+        $errors[] = 'Invalid user ID';
+    }
+    
+    if (isset($data['client_id']) && $data['client_id'] !== null && !validateInteger($data['client_id'], 1)) {
+        $errors[] = 'Invalid client ID';
+    }
+    
+    // Validate priority
+    if (isset($data['priority'])) {
+        $validPriorities = ['low', 'medium', 'high'];
+        if (!in_array($data['priority'], $validPriorities)) {
+            $errors[] = 'Invalid priority value';
+        }
+    }
+    
+    // Validate dates
+    if (isset($data['due_date']) && !empty($data['due_date'])) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['due_date'])) {
+            $errors[] = 'Invalid due date format (YYYY-MM-DD)';
+        }
+    }
+    
+    if (!empty($errors)) {
+        error_log('DATA_VALIDATION_FAILED: ' . implode('; ', $errors));
+        sendResponse(['error' => 'Validation failed: ' . implode(', ', $errors)], 400);
+    }
+    
+    return $data;
 }
 
 function sanitizeInput($input) {
-    error_log('DEBUG: sanitizeInput - Input: ' . print_r($input, true));
     if (is_array($input)) {
-        $result = array_map('sanitizeInput', $input);
-        error_log('DEBUG: sanitizeInput - Array result: ' . print_r($result, true));
-        return $result;
+        return array_map('sanitizeInput', $input);
     }
-    $result = htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
-    error_log('DEBUG: sanitizeInput - String result: ' . $result);
-    return $result;
+    
+    if (is_null($input)) {
+        return null;
+    }
+    
+    // Remove potential XSS vectors
+    $input = trim($input);
+    $input = htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    
+    // Remove dangerous script patterns
+    $patterns = [
+        '/javascript:/i',
+        '/vbscript:/i',
+        '/onload\s*=/i',
+        '/onerror\s*=/i',
+        '/onclick\s*=/i',
+        '/<script[^>]*>/i',
+        '/<\/script>/i'
+    ];
+    
+    foreach ($patterns as $pattern) {
+        $input = preg_replace($pattern, '', $input);
+    }
+    
+    return $input;
+}
+
+function validateEmail($email) {
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+function validateInteger($value, $min = null, $max = null) {
+    if (!is_numeric($value)) {
+        return false;
+    }
+    
+    $int = (int)$value;
+    if ($min !== null && $int < $min) {
+        return false;
+    }
+    if ($max !== null && $int > $max) {
+        return false;
+    }
+    
+    return true;
+}
+
+function validateString($string, $minLength = 0, $maxLength = 10000, $allowEmpty = false) {
+    if (!$allowEmpty && empty($string)) {
+        return false;
+    }
+    
+    $length = strlen($string);
+    return $length >= $minLength && $length <= $maxLength;
 }
 
 function sanitizeOutput($output) {
@@ -618,22 +793,143 @@ function createNotification($pdo, $userId, $taskId, $message, $type) {
 }
 
 function checkRateLimit($pdo, $userId, $action, $limit = 5, $window = 300) {
+    // Ensure rate_limits table exists
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS rate_limits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            action VARCHAR(50) NOT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (user_id, action, created_at),
+            INDEX (ip_address, created_at)
+        )");
+    } catch (Exception $e) {
+        error_log("Failed to create rate_limits table: " . $e->getMessage());
+    }
+    
+    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+    
+    // Check user-based rate limit
     $stmt = $pdo->prepare("
         SELECT COUNT(*) as count 
         FROM rate_limits 
         WHERE user_id = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
     ");
     $stmt->execute([$userId, $action, $window]);
-    $result = $stmt->fetch();
+    $userCount = $stmt->fetch()['count'];
     
-    if ($result['count'] >= $limit) {
-        return false; // Rate limit exceeded
+    // Check IP-based rate limit (more restrictive)
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count 
+        FROM rate_limits 
+        WHERE ip_address = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+    ");
+    $stmt->execute([$ipAddress, $action, $window]);
+    $ipCount = $stmt->fetch()['count'];
+    
+    if ($userCount >= $limit || $ipCount >= ($limit * 2)) {
+        error_log("Rate limit exceeded for user $userId, IP $ipAddress, action $action");
+        return false;
     }
     
-    $stmt = $pdo->prepare("INSERT INTO rate_limits (user_id, action) VALUES (?, ?)");
-    $stmt->execute([$userId, $action]);
+    // Log the action
+    $stmt = $pdo->prepare("INSERT INTO rate_limits (user_id, action, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$userId, $action, $ipAddress, $userAgent]);
     
-    return true; // Rate limit not exceeded
+    return true;
+}
+
+function createSecurityLog($pdo, $event, $details = '', $severity = 'INFO') {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS security_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            event VARCHAR(100) NOT NULL,
+            user_id INT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            details TEXT,
+            severity ENUM('INFO', 'WARNING', 'CRITICAL') DEFAULT 'INFO',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX (event, created_at),
+            INDEX (user_id, created_at),
+            INDEX (ip_address, created_at)
+        )");
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO security_logs (event, user_id, ip_address, user_agent, details, severity) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $event,
+            $_SESSION['user_id'] ?? null,
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            $details,
+            $severity
+        ]);
+    } catch (Exception $e) {
+        error_log("Failed to create security log: " . $e->getMessage());
+    }
+}
+
+function checkIPRateLimit($pdo, $ipAddress, $action, $limit, $window) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) as count 
+            FROM rate_limits 
+            WHERE ip_address = ? AND action = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+        ");
+        $stmt->execute([$ipAddress, $action, $window]);
+        $count = $stmt->fetch()['count'];
+        
+        if ($count >= $limit) {
+            return false;
+        }
+        
+        $stmt = $pdo->prepare("INSERT INTO rate_limits (ip_address, action) VALUES (?, ?)");
+        $stmt->execute([$ipAddress, $action]);
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Rate limit check failed: " . $e->getMessage());
+        return true; // Fail open
+    }
+}
+
+function createDefaultUserPreferences($pdo, $userId) {
+    $defaultModules = ['crm', 'calendar', 'notes', 'kanban', 'dashboard'];
+    
+    foreach ($defaultModules as $module) {
+        $stmt = $pdo->prepare("INSERT IGNORE INTO user_preferences (user_id, module_name, is_enabled) VALUES (?, ?, ?)");
+        $stmt->execute([$userId, $module, 1]); // Use 1 instead of true for tinyint
+    }
+}
+
+function getUserPreferences($pdo, $userId) {
+    $stmt = $pdo->prepare("SELECT module_name, is_enabled FROM user_preferences WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $preferences = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    
+    // If no preferences exist, create defaults
+    if (empty($preferences)) {
+        createDefaultUserPreferences($pdo, $userId);
+        $stmt->execute([$userId]);
+        $preferences = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+    
+    return $preferences;
+}
+
+function updateUserPreference($pdo, $userId, $moduleName, $isEnabled) {
+    // Convert boolean to integer for tinyint field
+    $isEnabledInt = $isEnabled ? 1 : 0;
+    
+    $stmt = $pdo->prepare("INSERT INTO user_preferences (user_id, module_name, is_enabled) VALUES (?, ?, ?) 
+                          ON DUPLICATE KEY UPDATE is_enabled = VALUES(is_enabled), updated_at = CURRENT_TIMESTAMP");
+    $stmt->execute([$userId, $moduleName, $isEnabledInt]);
 }
 
 

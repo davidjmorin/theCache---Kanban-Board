@@ -27,6 +27,7 @@ class KanbanApp {
         this.notePopupEditor = null;
         this.descriptionPopupEditor = null;
         this.csrfToken = null;
+        this.userPreferences = {};
 
         this.init();
     }
@@ -43,6 +44,8 @@ class KanbanApp {
         document.getElementById('loadingScreen').style.display = 'none';
 
         if (this.currentUser) {
+            await this.loadUserPreferences();
+            this.updateNavigationVisibility();
             this.startAutoRefresh();
             
             const urlParams = new URLSearchParams(window.location.search);
@@ -3995,6 +3998,33 @@ class KanbanApp {
             icon.className = 'fas fa-chevron-down';
             header.classList.remove('expanded');
         }
+    }
+
+    async loadUserPreferences() {
+        try {
+            const response = await this.apiCall('user-preferences');
+            this.userPreferences = response || {};
+        } catch (error) {
+            console.error('Failed to load user preferences:', error);
+            this.userPreferences = {};
+        }
+    }
+
+    updateNavigationVisibility() {
+        const headerNav = document.getElementById('headerNav');
+        if (!headerNav) return;
+
+        const navButtons = headerNav.querySelectorAll('[data-module]');
+        navButtons.forEach(button => {
+            const module = button.getAttribute('data-module');
+            const isEnabled = this.userPreferences[module] !== 0 && this.userPreferences[module] !== false; // Default to enabled unless explicitly disabled (0 or false)
+            
+            if (isEnabled) {
+                button.style.display = '';
+            } else {
+                button.style.display = 'none';
+            }
+        });
     }
 }
 

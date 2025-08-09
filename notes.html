@@ -1049,12 +1049,15 @@
                     <img src="assets/thecache_logo.png" alt="The Cache Logo" class="header-logo">
                     <h1>Notes</h1>
                 </div>
-                <div class="header-right">
-                    <button class="btn btn-secondary" onclick="window.location.href='/kanban.html'">
+                <div class="header-right" id="headerNav">
+                    <button class="btn btn-secondary" data-module="kanban" onclick="window.location.href='/kanban.html'">
                         <i class="fas fa-tasks"></i> Kanban
                     </button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/crm'">
+                    <button class="btn btn-secondary" data-module="crm" onclick="window.location.href='/crm'">
                         <i class="fas fa-users"></i> CRM
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.location.href='/preferences'">
+                        <i class="fas fa-cog"></i> Preferences
                     </button>
                     <button class="btn btn-danger" onclick="notesApp.logout()">
                         <i class="fas fa-sign-out-alt"></i> Logout

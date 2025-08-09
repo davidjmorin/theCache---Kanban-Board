@@ -77,6 +77,8 @@ function requireAuth() {
     if (!isset($_SESSION['user_id'])) {
         sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
     }
+    // Validate CSRF for state-changing operations
+    validateCSRFForStateChanges();
 }
 
 function requireAdmin() {

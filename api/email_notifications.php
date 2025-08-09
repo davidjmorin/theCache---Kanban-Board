@@ -120,8 +120,8 @@ class EmailNotifications {
     public function sendEmailViaBrevoPublic($to, $subject, $message) {
         $data = [
             'sender' => [
-                'name' => 'Kanban Board',
-                'email' => 'Admin@thecache.io'
+                'name' => getenv('SENDER_NAME') ?: 'Kanban Board',
+                'email' => getenv('ADMIN_EMAIL') ?: 'admin@localhost'
             ],
             'to' => [
                 [

@@ -7,6 +7,7 @@ class NotesApp {
         this.currentNote = null;
         this.editor = null;
         this.csrfToken = null;
+        this.userPreferences = {};
         this.init();
     }
 
@@ -28,6 +29,8 @@ class NotesApp {
             placeholder: 'Start writing your note...\n\nUse Markdown syntax for formatting:\n# Headers\n**Bold**\n*Italic*\n- Lists\n[Links](url)'
         });
 
+        await this.loadUserPreferences();
+        this.updateNavigationVisibility();
         await this.loadClients();
         await this.loadTasks();
         await this.loadNotes();
@@ -547,6 +550,37 @@ class NotesApp {
                 }
             }, 300);
         }, 3000);
+    }
+
+    async loadUserPreferences() {
+        try {
+            const response = await fetch(this.apiBase + 'user-preferences');
+            if (response.ok) {
+                this.userPreferences = await response.json();
+            } else {
+                this.userPreferences = {};
+            }
+        } catch (error) {
+            console.error('Failed to load user preferences:', error);
+            this.userPreferences = {};
+        }
+    }
+
+    updateNavigationVisibility() {
+        const headerNav = document.getElementById('headerNav');
+        if (!headerNav) return;
+
+        const navButtons = headerNav.querySelectorAll('[data-module]');
+        navButtons.forEach(button => {
+            const module = button.getAttribute('data-module');
+            const isEnabled = this.userPreferences[module] !== 0 && this.userPreferences[module] !== false; // Default to enabled unless explicitly disabled (0 or false)
+            
+            if (isEnabled) {
+                button.style.display = '';
+            } else {
+                button.style.display = 'none';
+            }
+        });
     }
 }
 

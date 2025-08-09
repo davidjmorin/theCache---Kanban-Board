@@ -192,38 +192,7 @@ switch ($endpoint) {
             requireAuth();
             handleUnshareTask($pdo, $method, $id);
             break;
-    case 'debug':
-        sendResponse(['status' => 'API is working', 'session_user_id' => $_SESSION['user_id'] ?? 'not set']);
-        break;
-    case 'debug-shares':
-        requireAuth();
-        $boardId = $_GET['board_id'] ?? null;
-        $taskId = $_GET['task_id'] ?? null;
-
-        if ($boardId) {
-            $stmt = $pdo->prepare("
-                SELECT bs.*, u.name as user_name 
-                FROM board_shares bs 
-                JOIN users u ON bs.user_id = u.id 
-                WHERE bs.board_id = ?
-            ");
-            $stmt->execute([$boardId]);
-            $shares = $stmt->fetchAll();
-            sendResponse(['board_id' => $boardId, 'shares' => $shares]);
-        } elseif ($taskId) {
-            $stmt = $pdo->prepare("
-                SELECT ts.*, u.name as user_name 
-                FROM task_shares ts 
-                JOIN users u ON ts.user_id = u.id 
-                WHERE ts.task_id = ?
-            ");
-            $stmt->execute([$taskId]);
-            $shares = $stmt->fetchAll();
-            sendResponse(['task_id' => $taskId, 'shares' => $shares]);
-        } else {
-            sendResponse(['error' => 'Board ID or Task ID required']);
-        }
-        break;
+    // Debug endpoints removed for production security
     case 'crm-csv-import':
         handleCrmCsvImport();
         break;
@@ -238,6 +207,10 @@ switch ($endpoint) {
         requireAuth();
         handleNoteLinks($pdo, $method, $id);
         break;
+    case 'user-preferences':
+        requireAuth();
+        handleUserPreferences($pdo, $method, $id);
+        break;
     default:
         sendResponse(['error' => 'Endpoint not found'], 404);
 }
@@ -246,6 +219,8 @@ function requireAuth() {
     if (!isset($_SESSION['user_id'])) {
         sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
     }
+    // Validate CSRF for state-changing operations
+    validateCSRFForStateChanges();
 }
 
 function requireAdmin() {
@@ -272,13 +247,23 @@ function handleLogin($pdo, $method) {
     $data = getRequestBody();
     validateRequired($data, ['email', 'password']);
 
+    // Rate limiting for login attempts
+    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    if (!checkIPRateLimit($pdo, $ipAddress, 'login', 5, 900)) { // 5 attempts per 15 min
+        createSecurityLog($pdo, 'LOGIN_RATE_LIMIT', "IP: $ipAddress", 'WARNING');
+        sendResponse(['error' => 'Too many login attempts. Please try again later.'], 429);
+    }
+
     $stmt = $pdo->prepare("SELECT id, name, email, password, is_admin FROM users WHERE email = ? AND is_active = 1");
     $stmt->execute([$data['email']]);
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($data['password'], $user['password'])) {
+        createSecurityLog($pdo, 'LOGIN_FAILED', "Email: " . $data['email'], 'WARNING');
         sendResponse(['error' => 'Invalid credentials'], 401);
     }
+    
+    createSecurityLog($pdo, 'LOGIN_SUCCESS', "User: " . $user['email'], 'INFO');
 
             $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
         $stmt->execute([$user['id']]);
@@ -354,6 +339,9 @@ function handleRegister($pdo, $method) {
 
         $userId = $pdo->lastInsertId();
         error_log('DEBUG: User registered successfully with ID: ' . $userId);
+
+        // Create default preferences for the new user
+        createDefaultUserPreferences($pdo, $userId);
 
         $_SESSION['user_id'] = $userId;
         $_SESSION['user_name'] = $data['name'];
@@ -677,10 +665,7 @@ function handleTasks($pdo, $method, $id) {
                 $data = getRequestBody();
                 validateRequired($data, ['title', 'stage_id', 'board_id']);
                 
-                $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
-                if ($csrfToken) {
-                    validateCSRFToken($csrfToken);
-                }
+                // CSRF validation handled in requireAuth() now
                 
                 $data['title'] = sanitizeInput($data['title']);
                 $data['description'] = sanitizeInput($data['description'] ?? '');
@@ -1437,29 +1422,44 @@ function handleAttachments($pdo, $method, $id) {
             }
 
             $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx'];
-            $maxFileSize = 10 * 1024 * 1024; // 10MB
+            $maxFileSize = 5 * 1024 * 1024; // Reduced to 5MB for security
             $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            
+            // Enhanced filename validation
+            $originalName = basename($file['name']);
+            if (preg_match('/[^a-zA-Z0-9._-]/', $originalName)) {
+                sendResponse(['error' => 'Invalid characters in filename'], 400);
+            }
             
             if (!in_array($extension, $allowedTypes)) {
                 sendResponse(['error' => 'Invalid file type. Allowed types: ' . implode(', ', $allowedTypes)], 400);
             }
             
             if ($file['size'] > $maxFileSize) {
-                sendResponse(['error' => 'File too large. Maximum size: 10MB'], 400);
+                sendResponse(['error' => 'File too large. Maximum size: 5MB'], 400);
             }
             
+            // Double-check with MIME type validation
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mimeType = finfo_file($finfo, $file['tmp_name']);
             finfo_close($finfo);
             
             $allowedMimeTypes = [
-                'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+                'image/jpeg', 'image/png', 'image/gif',
                 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 'text/plain', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             ];
             
             if (!in_array($mimeType, $allowedMimeTypes)) {
-                sendResponse(['error' => 'Invalid file MIME type'], 400);
+                error_log("Blocked file upload with MIME type: " . $mimeType . " from user: " . $_SESSION['user_id']);
+                sendResponse(['error' => 'Invalid file MIME type: ' . $mimeType], 400);
+            }
+            
+            // Scan file content for potential threats
+            $fileContent = file_get_contents($file['tmp_name']);
+            if (strpos($fileContent, '<?php') !== false || strpos($fileContent, '<script') !== false) {
+                error_log("Blocked suspicious file upload from user: " . $_SESSION['user_id']);
+                sendResponse(['error' => 'File contains suspicious content'], 400);
             }
             
             $filename = uniqid() . '.' . $extension;
@@ -1918,8 +1918,8 @@ function sendDueNotificationEmail($userData) {
         return false;
     }
 
-    $senderEmail = 'noreply@thecache.io'; 
-    $senderName = 'Task Management System';
+    $senderEmail = getenv('SENDER_EMAIL') ?: 'noreply@localhost'; 
+    $senderName = getenv('SENDER_NAME') ?: 'Task Management System';
 
     $htmlContent = generateDueNotificationEmail($userData);
 
@@ -4757,6 +4757,68 @@ function handleOpportunityStats($pdo, $method) {
             }
             
             sendResponse($stats);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handleUserPreferences($pdo, $method, $id = null) {
+    $userId = $_SESSION['user_id'];
+    
+    switch ($method) {
+        case 'GET':
+            $preferences = getUserPreferences($pdo, $userId);
+            sendResponse($preferences);
+            break;
+            
+        case 'POST':
+        case 'PUT':
+            $data = getRequestBody();
+            
+            if (!isset($data['module_name']) || !isset($data['is_enabled'])) {
+                sendResponse(['error' => 'module_name and is_enabled are required'], 400);
+                return;
+            }
+            
+            $allowedModules = ['crm', 'calendar', 'notes', 'kanban', 'dashboard'];
+            if (!in_array($data['module_name'], $allowedModules)) {
+                sendResponse(['error' => 'Invalid module name'], 400);
+                return;
+            }
+            
+            try {
+                updateUserPreference($pdo, $userId, $data['module_name'], (bool)$data['is_enabled']);
+                sendResponse(['success' => true, 'message' => 'Preference updated successfully']);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to update preference: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'PATCH':
+            // Update multiple preferences at once
+            $data = getRequestBody();
+            
+            if (!isset($data['preferences']) || !is_array($data['preferences'])) {
+                sendResponse(['error' => 'preferences array is required'], 400);
+                return;
+            }
+            
+            $allowedModules = ['crm', 'calendar', 'notes', 'kanban', 'dashboard'];
+            
+            try {
+                foreach ($data['preferences'] as $moduleName => $isEnabled) {
+                    if (!in_array($moduleName, $allowedModules)) {
+                        sendResponse(['error' => "Invalid module name: $moduleName"], 400);
+                        return;
+                    }
+                    updateUserPreference($pdo, $userId, $moduleName, (bool)$isEnabled);
+                }
+                sendResponse(['success' => true, 'message' => 'Preferences updated successfully']);
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to update preferences: ' . $e->getMessage()], 500);
+            }
             break;
             
         default:

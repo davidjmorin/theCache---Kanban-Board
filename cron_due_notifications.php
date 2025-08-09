@@ -80,8 +80,8 @@ function sendDueNotificationEmail($userData) {
         return false;
     }
     
-    $senderEmail = 'admin@thecache.io'; // Update with your sender email
-    $senderName = 'Task Management System';
+    $senderEmail = getenv('ADMIN_EMAIL') ?: 'admin@localhost'; // Configured via .env file
+    $senderName = getenv('SENDER_NAME') ?: 'Task Management System';
     
     $htmlContent = generateDueNotificationEmail($userData);
     

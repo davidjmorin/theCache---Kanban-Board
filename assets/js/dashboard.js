@@ -12,6 +12,7 @@ class DashboardApp {
             tbrMeetings: [],
             opportunityStats: null
         };
+        this.userPreferences = {};
         this.csrfToken = null;
 
         this.init();
@@ -25,7 +26,10 @@ class DashboardApp {
 
         if (this.currentUser) {
             await this.loadDashboardData();
+            await this.loadUserPreferences();
             this.updateDashboard();
+            this.updateNavigationVisibility();
+            this.updateCrmSectionVisibility();
         }
     }
 
@@ -375,6 +379,39 @@ class DashboardApp {
         if (mobileMenuBtn) {
             mobileMenuBtn.addEventListener('click', () => this.toggleMobileMenu());
         }
+
+        // Setup dropdown functionality
+        this.setupDropdowns();
+    }
+
+    setupDropdowns() {
+        const userDropdown = document.getElementById('userDropdown');
+        const userMenu = document.getElementById('userMenu');
+
+        if (userDropdown) {
+            userDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userDropdown.parentElement.classList.toggle('active');
+            });
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                });
+            }
+        });
+
+        // Close dropdowns on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                });
+            }
+        });
     }
 
     async handleLogin(e) {
@@ -511,6 +548,52 @@ class DashboardApp {
     showBoardsModal() {
         console.log('Opening boards modal');
         window.location.href = '/kanban.html';
+    }
+
+    async loadUserPreferences() {
+        try {
+            const response = await this.apiCall('user-preferences');
+            this.userPreferences = response || {};
+        } catch (error) {
+            console.error('Failed to load user preferences:', error);
+            this.userPreferences = {};
+        }
+    }
+
+    updateNavigationVisibility() {
+        const headerNav = document.getElementById('headerNav');
+        if (!headerNav) return;
+
+        const navButtons = headerNav.querySelectorAll('[data-module]');
+        navButtons.forEach(button => {
+            const module = button.getAttribute('data-module');
+            const isEnabled = this.userPreferences[module] !== 0 && this.userPreferences[module] !== false; // Default to enabled unless explicitly disabled (0 or false)
+            
+            if (isEnabled) {
+                button.style.display = '';
+            } else {
+                button.style.display = 'none';
+            }
+        });
+    }
+
+    updateCrmSectionVisibility() {
+        // Check if CRM module is enabled
+        const isCrmEnabled = this.userPreferences['crm'] !== 0 && this.userPreferences['crm'] !== false;
+        
+        // Get all CRM-related sections
+        const crmSections = document.querySelectorAll('[data-crm-section]');
+        
+        crmSections.forEach(section => {
+            if (isCrmEnabled) {
+                section.style.display = '';
+            } else {
+                section.style.display = 'none';
+            }
+        });
+        
+        // Log for debugging
+        console.log(`CRM sections ${isCrmEnabled ? 'shown' : 'hidden'} based on user preference:`, this.userPreferences['crm']);
     }
 }
 

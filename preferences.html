@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Cache - User Preferences</title>
+    <link rel="icon" type="image/png" href="assets/thecache_logo.png">
+    <link rel="shortcut icon" type="image/png" href="assets/thecache_logo.png">
+    <link rel="apple-touch-icon" href="assets/thecache_logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/styles.css?v4.8">
+    <style>
+        .preferences-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: var(--card-background);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .preferences-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .preferences-header h1 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.75rem;
+        }
+
+        .preferences-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .module-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .module-card:hover {
+            border-color: var(--primary-color);
+        }
+
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .module-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .module-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+            color: white;
+        }
+
+        .module-icon.crm {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .module-icon.calendar {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .module-icon.notes {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .module-icon.kanban {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .module-icon.dashboard {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .module-details h3 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .module-details p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .preferences-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .back-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .back-link:hover {
+            color: var(--primary-color);
+        }
+
+        .save-status {
+            font-size: 0.875rem;
+            color: var(--success-color);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .save-status.show {
+            opacity: 1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .loading i {
+            font-size: 2rem;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .preferences-container {
+                margin: 1rem;
+                padding: 1rem;
+            }
+
+            .module-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .preferences-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.5rem;
+            }
+
+            .preferences-actions {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container" id="loginContainer" style="display: none;">
+        <div class="login-logo">
+            <img src="assets/thecache_logo.png" alt="The Cache Logo" class="logo-image">
+        </div>
+        <form class="login-form" id="loginForm">
+            <h2>Login to The Cache</h2>
+            <div class="form-group">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" name="password" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="app-container" id="appContainer" style="display: none;">
+        <div class="preferences-container">
+            <div class="preferences-header">
+                <div>
+                    <i class="fas fa-cog" style="color: var(--primary-color); font-size: 1.5rem;"></i>
+                </div>
+                <div>
+                    <h1>User Preferences</h1>
+                    <p style="color: var(--text-secondary); margin: 0;">Customize which modules are visible to you</p>
+                </div>
+            </div>
+
+            <div id="loadingPreferences" class="loading">
+                <i class="fas fa-spinner"></i>
+                <p>Loading preferences...</p>
+            </div>
+
+            <div id="preferencesContent" style="display: none;">
+                <div class="preferences-section">
+                    <h2 class="section-title">
+                        <i class="fas fa-th-large"></i>
+                        Module Visibility
+                    </h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        Toggle which modules you want to see in your navigation and dashboard. Changes are saved automatically.
+                    </p>
+
+                    <div class="module-grid" id="moduleGrid">
+                        <!-- Module cards will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="preferences-actions">
+                    <a href="/" class="back-link">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Dashboard
+                    </a>
+                    <div class="save-status" id="saveStatus">
+                        <i class="fas fa-check"></i>
+                        Preferences saved
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading preferences...</p>
+        </div>
+    </div>
+
+    <script src="assets/js/preferences.js?v=1.0"></script>
+</body>
+</html>
