@@ -59,6 +59,7 @@ class PreferencesApp {
 
             if (data.authenticated) {
                 this.currentUser = data.user;
+                window.csrfToken = data.csrf_token; // Store CSRF token globally
                 document.getElementById('loginContainer').style.display = 'none';
                 document.getElementById('appContainer').style.display = 'block';
             } else {

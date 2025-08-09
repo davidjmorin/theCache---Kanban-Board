@@ -314,14 +314,6 @@ The application provides a comprehensive RESTful API:
 - `POST /api/notifications/{id}/read` - Mark notification as read
 - `DELETE /api/notifications/{id}` - Delete notification
 
-## 🌐 **Browser Support**
-
-- **Chrome** 60+
-- **Firefox** 60+
-- **Safari** 12+
-- **Edge** 79+
-- **Mobile browsers** (iOS Safari, Chrome Mobile)
-
 ## 🔒 **Comprehensive Security Framework**
 
 ### **🛡️ Authentication & Session Security**
@@ -432,15 +424,8 @@ ADMIN_EMAIL=admin@yourdomain.com
 - **Lazy Loading** - Progressive content loading
 - **Compressed Assets** - Optimized CSS and JavaScript delivery
 
-## 🤝 **Contributing**
-
-This is a comprehensive kanban board application designed for team collaboration and project management. The codebase is well-structured and documented for easy maintenance and feature additions.
-
-## 📄 **License**
-
-This project is designed for internal use and team collaboration. All features are production-ready and thoroughly tested.
-
 ---
+###  Images
 
 <img width="2037" height="962" alt="image" src="https://github.com/user-attachments/assets/a45e073c-66bb-4c01-9259-748190c2f75c" />
 
@@ -453,6 +438,21 @@ This project is designed for internal use and team collaboration. All features a
 <img width="1305" height="972" alt="image" src="https://github.com/user-attachments/assets/cf1cf641-0c8c-4041-a5bd-27e59721d8eb" />
 
 <img width="1172" height="1032" alt="image" src="https://github.com/user-attachments/assets/825fe4ae-500c-4c2d-a340-2fe574f1c931" />
+
+<img width="1001" height="1144" alt="image" src="https://github.com/user-attachments/assets/a93cc43a-60a8-49a9-a3a4-d4d46466cc8d" />
+
+<img width="724" height="866" alt="image" src="https://github.com/user-attachments/assets/d81dfb28-503e-46f8-b265-2a9b177239f7" />
+
+<img width="1775" height="1128" alt="image" src="https://github.com/user-attachments/assets/0e87c1a5-ffe8-4ab1-9c94-0788782d29bf" />
+
+<img width="1786" height="945" alt="image" src="https://github.com/user-attachments/assets/5dedd076-389b-477e-92d5-71708f351577" />
+
+<img width="2016" height="1128" alt="image" src="https://github.com/user-attachments/assets/f5748208-664c-47ef-839c-be5ecd5e6e7b" />
+
+
+
+
+
 
 
 

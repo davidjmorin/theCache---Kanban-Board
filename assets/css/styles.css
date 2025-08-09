@@ -2204,6 +2204,67 @@ div#userMenu {
     color: var(--text-primary);
 }
 
+/* 2FA Form Specific Styles */
+#twoFAForm, #backupCodeForm {
+    margin: 0 auto;
+    text-align: center;
+}
+
+#twoFAForm h2, #backupCodeForm h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    color: var(--primary-color);
+}
+
+#twoFAForm p, #backupCodeForm p {
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+#twoFAForm .form-group, #backupCodeForm .form-group {
+    text-align: left;
+    margin-bottom: 1.5rem;
+}
+
+#twoFAForm input, #backupCodeForm input {
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 0.2em;
+    font-family: 'Courier New', monospace;
+}
+
+#totpCode {
+    font-size: 1.5rem;
+    padding: 1rem;
+    letter-spacing: 0.3em;
+}
+
+#backupCode {
+    font-size: 1.2rem;
+    padding: 0.875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+#twoFAForm .form-actions, #backupCodeForm .form-actions {
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+#twoFAForm a, #backupCodeForm a {
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
+}
+
+#twoFAForm a:hover, #backupCodeForm a:hover {
+    text-decoration: underline;
+}
+
 .user-info {
     display: flex;
     align-items: center;

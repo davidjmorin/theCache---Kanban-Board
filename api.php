@@ -211,6 +211,28 @@ switch ($endpoint) {
         requireAuth();
         handleUserPreferences($pdo, $method, $id);
         break;
+    case '2fa-setup':
+        requireAuth();
+        handle2FASetup($pdo, $method);
+        break;
+    case '2fa-enable':
+        requireAuth();
+        handle2FAEnable($pdo, $method);
+        break;
+    case '2fa-verify':
+        handle2FAVerify($pdo, $method);
+        break;
+    case '2fa-disable':
+        requireAuth();
+        handle2FADisable($pdo, $method);
+        break;
+    case '2fa-status':
+        requireAuth();
+        handle2FAStatus($pdo, $method);
+        break;
+    case '2fa-backup':
+        handle2FABackup($pdo, $method);
+        break;
     default:
         sendResponse(['error' => 'Endpoint not found'], 404);
 }
@@ -254,7 +276,7 @@ function handleLogin($pdo, $method) {
         sendResponse(['error' => 'Too many login attempts. Please try again later.'], 429);
     }
 
-    $stmt = $pdo->prepare("SELECT id, name, email, password, is_admin FROM users WHERE email = ? AND is_active = 1");
+    $stmt = $pdo->prepare("SELECT id, name, email, password, is_admin, has_2fa_enabled FROM users WHERE email = ? AND is_active = 1");
     $stmt->execute([$data['email']]);
     $user = $stmt->fetch();
 
@@ -263,12 +285,29 @@ function handleLogin($pdo, $method) {
         sendResponse(['error' => 'Invalid credentials'], 401);
     }
     
+    // Check if 2FA is enabled for this user
+    if ($user['has_2fa_enabled']) {
+        // Store user ID temporarily for 2FA verification
+        $_SESSION['pending_2fa_user_id'] = $user['id'];
+        
+        createSecurityLog($pdo, 'LOGIN_2FA_REQUIRED', "User: " . $user['email'], 'INFO');
+        
+        sendResponse([
+            'success' => true,
+            'requires_2fa' => true,
+            'temp_user_id' => $user['id'],
+            'message' => 'Please enter your 2FA verification code'
+        ]);
+        return;
+    }
+    
+    // Complete login for users without 2FA
     createSecurityLog($pdo, 'LOGIN_SUCCESS', "User: " . $user['email'], 'INFO');
 
-            $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-        $stmt->execute([$user['id']]);
+    $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+    $stmt->execute([$user['id']]);
 
-        $_SESSION['user_id'] = $user['id'];
+    $_SESSION['user_id'] = $user['id'];
     $_SESSION['user_name'] = $user['name'];
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['is_admin'] = (bool)$user['is_admin'];
@@ -379,9 +418,11 @@ function handleCheckAuth($pdo, $method) {
     }
 
     if (isset($_SESSION['user_id'])) {
+        $csrfToken = generateCSRFToken();
         sendResponse([
             'authenticated' => true,
-            'user' => getCurrentUser()
+            'user' => getCurrentUser(),
+            'csrf_token' => $csrfToken
         ]);
     } else {
         sendResponse(['authenticated' => false]);
@@ -4825,4 +4866,227 @@ function handleUserPreferences($pdo, $method, $id = null) {
             sendResponse(['error' => 'Method not allowed'], 405);
     }
 }
+
+// ============================================================================
+// 2FA Handler Functions
+// ============================================================================
+
+function handle2FASetup($pdo, $method) {
+    switch ($method) {
+        case 'GET':
+            $userId = $_SESSION['user_id'];
+            
+            // Get user email for QR code
+            $stmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                sendResponse(['error' => 'User not found'], 404);
+                return;
+            }
+            
+            $result = setup2FA($pdo, $userId, $user['email']);
+            sendResponse($result);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handle2FAEnable($pdo, $method) {
+    switch ($method) {
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($data['totp_code'])) {
+                sendResponse(['error' => 'TOTP code is required'], 400);
+                return;
+            }
+            
+            $userId = $_SESSION['user_id'];
+            $totpCode = sanitizeInput($data['totp_code']);
+            
+            // Rate limiting for 2FA enable attempts
+            if (!checkRateLimit($pdo, $userId, '2fa_enable', 5, 900)) {
+                sendResponse(['error' => 'Too many attempts. Please try again later.'], 429);
+                return;
+            }
+            
+            $result = enable2FA($pdo, $userId, $totpCode);
+            sendResponse($result);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handle2FAVerify($pdo, $method) {
+    switch ($method) {
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($data['totp_code']) || !isset($data['temp_user_id'])) {
+                sendResponse(['error' => 'TOTP code and user ID are required'], 400);
+                return;
+            }
+            
+            $userId = intval($data['temp_user_id']);
+            $totpCode = sanitizeInput($data['totp_code']);
+            
+            // Rate limiting for 2FA verification attempts
+            if (!checkRateLimit($pdo, $userId, '2fa_verify', 5, 900)) {
+                sendResponse(['error' => 'Too many 2FA verification attempts. Please wait 15 minutes before trying again.'], 429);
+                return;
+            }
+            
+            $result = verify2FALogin($pdo, $userId, $totpCode);
+            
+            if ($result['success']) {
+                // Complete the login process
+                $_SESSION['user_id'] = $userId;
+                unset($_SESSION['pending_2fa_user_id']);
+                
+                // Get user info for response
+                $stmt = $pdo->prepare("SELECT id, name, email, is_admin FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $user = $stmt->fetch();
+                
+                // Set session variables properly
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['user_email'] = $user['email'];
+                $_SESSION['is_admin'] = (bool)$user['is_admin'];
+                
+                // Update last login time
+                $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+                $stmt->execute([$userId]);
+                
+                createSecurityLog($pdo, 'LOGIN_SUCCESS_2FA', "User: " . $user['email'], 'INFO');
+                
+                $csrfToken = generateCSRFToken();
+                
+                sendResponse([
+                    'success' => true,
+                    'user' => [
+                        'id' => $user['id'],
+                        'name' => sanitizeOutput($user['name']),
+                        'email' => sanitizeOutput($user['email']),
+                        'is_admin' => (bool)$user['is_admin']
+                    ],
+                    'csrf_token' => $csrfToken,
+                    'message' => 'Login successful'
+                ]);
+            } else {
+                sendResponse($result);
+            }
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handle2FADisable($pdo, $method) {
+    switch ($method) {
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($data['password'])) {
+                sendResponse(['error' => 'Password is required to disable 2FA'], 400);
+                return;
+            }
+            
+            $userId = $_SESSION['user_id'];
+            $password = $data['password'];
+            
+            $result = disable2FA($pdo, $userId, $password);
+            sendResponse($result);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handle2FAStatus($pdo, $method) {
+    switch ($method) {
+        case 'GET':
+            $userId = $_SESSION['user_id'];
+            $status = get2FAStatus($pdo, $userId);
+            sendResponse(['status' => $status]);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handle2FABackup($pdo, $method) {
+    switch ($method) {
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($data['backup_code']) || !isset($data['temp_user_id'])) {
+                sendResponse(['error' => 'Backup code and user ID are required'], 400);
+                return;
+            }
+            
+            $userId = intval($data['temp_user_id']);
+            $backupCode = sanitizeInput($data['backup_code']);
+            
+            // Rate limiting for backup code attempts
+            if (!checkRateLimit($pdo, $userId, '2fa_backup', 3, 900)) {
+                sendResponse(['error' => 'Too many backup code attempts. Please wait 15 minutes before trying again.'], 429);
+                return;
+            }
+            
+            $result = verifyBackupCode($pdo, $userId, $backupCode);
+            
+            if ($result['success']) {
+                // Complete the login process
+                $_SESSION['user_id'] = $userId;
+                unset($_SESSION['pending_2fa_user_id']);
+                
+                // Get user info for response
+                $stmt = $pdo->prepare("SELECT id, name, email, is_admin FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $user = $stmt->fetch();
+                
+                // Set session variables properly
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['user_email'] = $user['email'];
+                $_SESSION['is_admin'] = (bool)$user['is_admin'];
+                
+                // Update last login time
+                $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+                $stmt->execute([$userId]);
+                
+                createSecurityLog($pdo, 'LOGIN_SUCCESS_BACKUP', "User: " . $user['email'], 'INFO');
+                
+                $csrfToken = generateCSRFToken();
+                
+                sendResponse([
+                    'success' => true,
+                    'user' => [
+                        'id' => $user['id'],
+                        'name' => sanitizeOutput($user['name']),
+                        'email' => sanitizeOutput($user['email']),
+                        'is_admin' => (bool)$user['is_admin']
+                    ],
+                    'csrf_token' => $csrfToken,
+                    'message' => 'Login successful using backup code',
+                    'remaining_codes' => $result['remaining_codes']
+                ]);
+            } else {
+                sendResponse($result);
+            }
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
 ?>

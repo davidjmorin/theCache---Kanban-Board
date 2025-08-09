@@ -223,6 +223,13 @@ class KanbanApp {
                 password: formData.get('password')
             });
 
+            // Check if 2FA is required
+            if (response.requires_2fa) {
+                this.hideLoading();
+                this.show2FAVerification(response.temp_user_id, formData.get('email'));
+                return;
+            }
+
             this.currentUser = response.user;
             this.csrfToken = response.csrf_token;
             
@@ -267,6 +274,219 @@ class KanbanApp {
     showLoginForm() {
         document.getElementById('registerForm').style.display = 'none';
         document.getElementById('loginForm').style.display = 'block';
+        this.hide2FAForm();
+    }
+
+    show2FAVerification(tempUserId, email) {
+        this.tempUserId = tempUserId;
+        this.tempEmail = email;
+        
+        // Hide login forms
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'none';
+        
+        // Show 2FA form
+        let twoFAForm = document.getElementById('twoFAForm');
+        if (!twoFAForm) {
+            this.create2FAForm();
+            twoFAForm = document.getElementById('twoFAForm');
+        }
+        
+        twoFAForm.style.display = 'block';
+        document.getElementById('twofa-email').textContent = email;
+        document.getElementById('totpCode').value = '';
+        document.getElementById('totpCode').focus();
+    }
+
+    hide2FAForm() {
+        const twoFAForm = document.getElementById('twoFAForm');
+        if (twoFAForm) {
+            twoFAForm.style.display = 'none';
+        }
+    }
+
+    create2FAForm() {
+        const authContainer = document.querySelector('.auth-forms');
+        if (!authContainer) return;
+
+        const twoFAFormHTML = `
+            <div id="twoFAForm" class="auth-form" style="display: none;">
+                <div class="auth-header">
+                    <h2><i class="fas fa-mobile-alt"></i> Two-Factor Authentication</h2>
+                    <p>Enter the 6-digit code from your authenticator app</p>
+                    <div class="user-info">
+                        <i class="fas fa-user"></i>
+                        <span id="twofa-email"></span>
+                    </div>
+                </div>
+                
+                <form id="twoFAVerifyForm">
+                    <div class="form-group">
+                        <input type="text" 
+                               id="totpCode" 
+                               name="totpCode" 
+                               placeholder="000000" 
+                               maxlength="6" 
+                               pattern="[0-9]{6}"
+                               autocomplete="off"
+                               style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem; font-family: monospace;"
+                               required>
+                        <i class="fas fa-key"></i>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-check"></i>
+                        Verify Code
+                    </button>
+                </form>
+
+                <div class="auth-alternatives">
+                    <button type="button" class="btn-link" onclick="app.showBackupCodeForm()">
+                        <i class="fas fa-key"></i>
+                        Use backup code instead
+                    </button>
+                    <button type="button" class="btn-link" onclick="app.cancelTwoFA()">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to login
+                    </button>
+                </div>
+            </div>
+
+            <div id="backupCodeForm" class="auth-form" style="display: none;">
+                <div class="auth-header">
+                    <h2><i class="fas fa-key"></i> Use Backup Code</h2>
+                    <p>Enter one of your 8-character backup codes</p>
+                    <div class="user-info">
+                        <i class="fas fa-user"></i>
+                        <span id="backup-email"></span>
+                    </div>
+                </div>
+                
+                <form id="backupCodeVerifyForm">
+                    <div class="form-group">
+                        <input type="text" 
+                               id="backupCode" 
+                               name="backupCode" 
+                               placeholder="XXXXXXXX" 
+                               maxlength="8" 
+                               autocomplete="off"
+                               style="text-align: center; font-size: 1.25rem; letter-spacing: 0.25rem; font-family: monospace; text-transform: uppercase;"
+                               required>
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-check"></i>
+                        Verify Backup Code
+                    </button>
+                </form>
+
+                <div class="auth-alternatives">
+                    <button type="button" class="btn-link" onclick="app.show2FAVerification(app.tempUserId, app.tempEmail)">
+                        <i class="fas fa-mobile-alt"></i>
+                        Use authenticator app instead
+                    </button>
+                    <button type="button" class="btn-link" onclick="app.cancelTwoFA()">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to login
+                    </button>
+                </div>
+            </div>
+        `;
+
+        authContainer.insertAdjacentHTML('beforeend', twoFAFormHTML);
+
+        // Add event listeners
+        document.getElementById('twoFAVerifyForm').addEventListener('submit', (e) => this.handleTwoFAVerification(e));
+        document.getElementById('backupCodeVerifyForm').addEventListener('submit', (e) => this.handleBackupCodeVerification(e));
+        
+        // Format TOTP input
+        document.getElementById('totpCode').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        
+        // Format backup code input
+        document.getElementById('backupCode').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        });
+    }
+
+    showBackupCodeForm() {
+        document.getElementById('twoFAForm').style.display = 'none';
+        document.getElementById('backupCodeForm').style.display = 'block';
+        document.getElementById('backup-email').textContent = this.tempEmail;
+        document.getElementById('backupCode').value = '';
+        document.getElementById('backupCode').focus();
+    }
+
+    cancelTwoFA() {
+        this.hide2FAForm();
+        document.getElementById('backupCodeForm').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        this.tempUserId = null;
+        this.tempEmail = null;
+    }
+
+    async handleTwoFAVerification(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const totpCode = formData.get('totpCode');
+
+        if (!totpCode || totpCode.length !== 6) {
+            this.showNotification('Please enter a valid 6-digit code', 'error');
+            return;
+        }
+
+        try {
+            this.showLoading();
+            const response = await this.apiCall('2fa-verify', 'POST', {
+                totp_code: totpCode,
+                temp_user_id: this.tempUserId
+            });
+
+            this.currentUser = response.user;
+            this.csrfToken = response.csrf_token;
+            
+            this.showNotification('Login successful!', 'success');
+            window.location.href = '/';
+        } catch (error) {
+            this.showNotification('Verification failed: ' + error.message, 'error');
+            document.getElementById('totpCode').value = '';
+            document.getElementById('totpCode').focus();
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async handleBackupCodeVerification(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const backupCode = formData.get('backupCode');
+
+        if (!backupCode || backupCode.length !== 8) {
+            this.showNotification('Please enter a valid 8-character backup code', 'error');
+            return;
+        }
+
+        try {
+            this.showLoading();
+            const response = await this.apiCall('2fa-backup', 'POST', {
+                backup_code: backupCode,
+                temp_user_id: this.tempUserId
+            });
+
+            this.currentUser = response.user;
+            this.csrfToken = response.csrf_token;
+            
+            this.showNotification(`Login successful! You have ${response.remaining_codes} backup codes remaining.`, 'success');
+            window.location.href = '/';
+        } catch (error) {
+            this.showNotification('Backup code verification failed: ' + error.message, 'error');
+            document.getElementById('backupCode').value = '';
+            document.getElementById('backupCode').focus();
+        } finally {
+            this.hideLoading();
+        }
     }
 
     async handleLogout() {

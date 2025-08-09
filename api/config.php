@@ -42,6 +42,12 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
 }
 
 require_once __DIR__ . '/env_loader.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Import 2FA libraries
+use OTPHP\TOTP;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
 
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'kanban_board2');
@@ -584,8 +590,29 @@ function createTbrTables($pdo) {
 function sendResponse($data, $status = 200) {
     http_response_code($status);
     
+    // Allow specific user-friendly error messages to pass through
+    $allowedErrorMessages = [
+        'Invalid verification code',
+        'Invalid backup code',
+        'Too many 2FA verification attempts. Please wait 15 minutes before trying again.',
+        'Too many backup code attempts. Please wait 15 minutes before trying again.',
+        '2FA not properly configured',
+        'Invalid credentials',
+        'Email already registered',
+        'Password requirements not met',
+        'CSRF token required',
+        'Invalid CSRF token',
+        'Authentication required',
+        'Admin access required',
+        'Method not allowed',
+        'Endpoint not found'
+    ];
+    
     if (isset($data['error']) && !isDevelopment()) {
-        $data['error'] = 'An error occurred. Please try again.';
+        // Only hide detailed errors that aren't user-friendly
+        if (!in_array($data['error'], $allowedErrorMessages)) {
+            $data['error'] = 'An error occurred. Please try again.';
+        }
     }
     
     echo json_encode($data);
@@ -932,5 +959,300 @@ function updateUserPreference($pdo, $userId, $moduleName, $isEnabled) {
     $stmt->execute([$userId, $moduleName, $isEnabledInt]);
 }
 
+// ============================================================================
+// 2FA (Two-Factor Authentication) Functions
+// ============================================================================
+
+/**
+ * Generate a new TOTP secret for a user
+ */
+function generate2FASecret() {
+    $totp = TOTP::create();
+    return $totp->getSecret();
+}
+
+/**
+ * Generate QR code for 2FA setup
+ */
+function generate2FAQRCode($secret, $userEmail) {
+    $appName = getenv('APP_NAME') ?: 'Kanban Board';
+    $issuer = getenv('APP_ISSUER') ?: 'Your Company';
+    
+    $totp = TOTP::create($secret);
+    $totp->setLabel($userEmail);
+    $totp->setIssuer($issuer);
+    
+    try {
+        // Create QR code builder with proper v6 API
+        $qrCode = new QrCode($totp->getProvisioningUri());
+        
+        $writer = new PngWriter();
+        $result = $writer->write($qrCode);
+        
+        return 'data:image/png;base64,' . base64_encode($result->getString());
+    } catch (Exception $e) {
+        error_log("QR Code generation error: " . $e->getMessage());
+        // Return a fallback - just the URI that can be manually entered
+        return $totp->getProvisioningUri();
+    }
+}
+
+/**
+ * Verify TOTP code
+ */
+function verify2FACode($secret, $code) {
+    if (empty($secret) || empty($code)) {
+        return false;
+    }
+    
+    $totp = TOTP::create($secret);
+    return $totp->verify($code, null, 1); // Allow 1 period (30 seconds) tolerance
+}
+
+/**
+ * Setup 2FA for a user - generate secret and return QR code
+ */
+function setup2FA($pdo, $userId, $userEmail) {
+    try {
+        $secret = generate2FASecret();
+        $qrCode = generate2FAQRCode($secret, $userEmail);
+        
+        // Store the secret temporarily (not activated yet)
+        $stmt = $pdo->prepare("
+            INSERT INTO user_2fa (user_id, secret_key, is_active) 
+            VALUES (?, ?, 0) 
+            ON DUPLICATE KEY UPDATE secret_key = VALUES(secret_key), is_active = 0
+        ");
+        $stmt->execute([$userId, $secret]);
+        
+        // Mark user as having pending 2FA setup
+        $stmt = $pdo->prepare("UPDATE users SET pending_2fa_setup = 1 WHERE id = ?");
+        $stmt->execute([$userId]);
+        
+        createSecurityLog($pdo, '2FA_SETUP_INITIATED', "User ID: $userId", 'INFO', $userId);
+        
+        return [
+            'success' => true,
+            'secret' => $secret,
+            'qr_code' => $qrCode,
+            'manual_entry_key' => chunk_split($secret, 4, ' ')
+        ];
+        
+    } catch (Exception $e) {
+        error_log("2FA setup error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Failed to setup 2FA'];
+    }
+}
+
+/**
+ * Enable 2FA for a user after verification
+ */
+function enable2FA($pdo, $userId, $totpCode) {
+    try {
+        // Get the pending secret
+        $stmt = $pdo->prepare("SELECT secret_key FROM user_2fa WHERE user_id = ? AND is_active = 0");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch();
+        
+        if (!$result) {
+            return ['success' => false, 'error' => '2FA setup not found. Please restart the setup process.'];
+        }
+        
+        $secret = $result['secret_key'];
+        
+        // Verify the TOTP code
+        if (!verify2FACode($secret, $totpCode)) {
+            createSecurityLog($pdo, '2FA_ENABLE_FAILED', "Invalid TOTP code for User ID: $userId", 'WARNING', $userId);
+            return ['success' => false, 'error' => 'Invalid verification code. Please try again.'];
+        }
+        
+        // Generate backup codes
+        $backupCodes = generateBackupCodes();
+        
+        // Activate 2FA
+        $stmt = $pdo->prepare("
+            UPDATE user_2fa 
+            SET is_active = 1, backup_codes = ?, created_at = CURRENT_TIMESTAMP 
+            WHERE user_id = ?
+        ");
+        $stmt->execute([json_encode($backupCodes), $userId]);
+        
+        // Update user table
+        $stmt = $pdo->prepare("UPDATE users SET has_2fa_enabled = 1, pending_2fa_setup = 0 WHERE id = ?");
+        $stmt->execute([$userId]);
+        
+        createSecurityLog($pdo, '2FA_ENABLED', "User ID: $userId", 'INFO', $userId);
+        
+        return [
+            'success' => true,
+            'backup_codes' => $backupCodes,
+            'message' => '2FA has been successfully enabled for your account.'
+        ];
+        
+    } catch (Exception $e) {
+        error_log("2FA enable error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Failed to enable 2FA'];
+    }
+}
+
+/**
+ * Verify 2FA during login
+ */
+function verify2FALogin($pdo, $userId, $totpCode) {
+    try {
+        // Get user's 2FA secret
+        $stmt = $pdo->prepare("SELECT secret_key FROM user_2fa WHERE user_id = ? AND is_active = 1");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch();
+        
+        if (!$result) {
+            return ['success' => false, 'error' => '2FA not properly configured'];
+        }
+        
+        $secret = $result['secret_key'];
+        
+        // Verify TOTP code
+        if (verify2FACode($secret, $totpCode)) {
+            // Update last used timestamp
+            $stmt = $pdo->prepare("UPDATE user_2fa SET last_used_at = CURRENT_TIMESTAMP WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            
+            createSecurityLog($pdo, '2FA_LOGIN_SUCCESS', "User ID: $userId", 'INFO', $userId);
+            return ['success' => true];
+        } else {
+            createSecurityLog($pdo, '2FA_LOGIN_FAILED', "Invalid TOTP for User ID: $userId", 'WARNING', $userId);
+            return ['success' => false, 'error' => 'Invalid verification code'];
+        }
+        
+    } catch (Exception $e) {
+        error_log("2FA verification error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Verification failed'];
+    }
+}
+
+/**
+ * Disable 2FA for a user
+ */
+function disable2FA($pdo, $userId, $password) {
+    try {
+        // Verify user's password first
+        $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user || !password_verify($password, $user['password'])) {
+            createSecurityLog($pdo, '2FA_DISABLE_FAILED', "Invalid password for User ID: $userId", 'WARNING', $userId);
+            return ['success' => false, 'error' => 'Invalid password'];
+        }
+        
+        // Remove 2FA data
+        $stmt = $pdo->prepare("DELETE FROM user_2fa WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        
+        // Update user table
+        $stmt = $pdo->prepare("UPDATE users SET has_2fa_enabled = 0, pending_2fa_setup = 0 WHERE id = ?");
+        $stmt->execute([$userId]);
+        
+        createSecurityLog($pdo, '2FA_DISABLED', "User ID: $userId", 'INFO', $userId);
+        
+        return ['success' => true, 'message' => '2FA has been disabled for your account.'];
+        
+    } catch (Exception $e) {
+        error_log("2FA disable error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Failed to disable 2FA'];
+    }
+}
+
+/**
+ * Generate backup codes for 2FA recovery
+ */
+function generateBackupCodes($count = 8) {
+    $codes = [];
+    for ($i = 0; $i < $count; $i++) {
+        // Generate 8-character alphanumeric codes
+        $codes[] = substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
+    }
+    return $codes;
+}
+
+/**
+ * Verify backup code and use it for recovery
+ */
+function verifyBackupCode($pdo, $userId, $backupCode) {
+    try {
+        $stmt = $pdo->prepare("SELECT backup_codes, recovery_count FROM user_2fa WHERE user_id = ? AND is_active = 1");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch();
+        
+        if (!$result) {
+            return ['success' => false, 'error' => '2FA not configured'];
+        }
+        
+        $backupCodes = json_decode($result['backup_codes'], true);
+        $recoveryCount = $result['recovery_count'];
+        
+        // Check if the code exists and remove it
+        $codeIndex = array_search(strtoupper($backupCode), $backupCodes);
+        if ($codeIndex === false) {
+            createSecurityLog($pdo, '2FA_BACKUP_FAILED', "Invalid backup code for User ID: $userId", 'WARNING', $userId);
+            return ['success' => false, 'error' => 'Invalid backup code'];
+        }
+        
+        // Remove the used code
+        unset($backupCodes[$codeIndex]);
+        $backupCodes = array_values($backupCodes); // Re-index array
+        
+        // Update the database
+        $stmt = $pdo->prepare("
+            UPDATE user_2fa 
+            SET backup_codes = ?, recovery_count = recovery_count + 1, last_used_at = CURRENT_TIMESTAMP 
+            WHERE user_id = ?
+        ");
+        $stmt->execute([json_encode($backupCodes), $userId]);
+        
+        createSecurityLog($pdo, '2FA_BACKUP_USED', "Backup code used for User ID: $userId, remaining codes: " . count($backupCodes), 'INFO', $userId);
+        
+        return [
+            'success' => true,
+            'remaining_codes' => count($backupCodes),
+            'message' => 'Backup code accepted. You have ' . count($backupCodes) . ' backup codes remaining.'
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Backup code verification error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Verification failed'];
+    }
+}
+
+/**
+ * Get 2FA status for a user
+ */
+function get2FAStatus($pdo, $userId) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT u.has_2fa_enabled, u.pending_2fa_setup, 
+                   f.created_at, f.last_used_at, f.recovery_count,
+                   JSON_LENGTH(f.backup_codes) as backup_codes_count
+            FROM users u 
+            LEFT JOIN user_2fa f ON u.id = f.user_id 
+            WHERE u.id = ?
+        ");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch();
+        
+        return [
+            'enabled' => (bool)$result['has_2fa_enabled'],
+            'pending_setup' => (bool)$result['pending_2fa_setup'],
+            'setup_date' => $result['created_at'],
+            'last_used' => $result['last_used_at'],
+            'recovery_count' => $result['recovery_count'] ?? 0,
+            'backup_codes_remaining' => $result['backup_codes_count'] ?? 0
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Get 2FA status error: " . $e->getMessage());
+        return ['enabled' => false, 'pending_setup' => false];
+    }
+}
 
 ?>
