@@ -418,7 +418,6 @@ function handleUsers($pdo, $method, $id) {
                 $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
                 sendResponse($stmt->fetchAll());
             } else {
-                // Get users who are part of boards the current user has access to
                 $stmt = $pdo->prepare("
                     SELECT DISTINCT u.* 
                     FROM users u
@@ -484,7 +483,6 @@ function handleClients($pdo, $method, $id) {
             $isAdmin = $_SESSION['is_admin'] ?? false;
             
             if ($id) {
-                // For individual client, check if user has access
                 if ($isAdmin) {
                     $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
                     $stmt->execute([$id]);
@@ -494,7 +492,6 @@ function handleClients($pdo, $method, $id) {
                     }
                     sendResponse($client);
                 } else {
-                    // Check if client is associated with user's tasks
                     $stmt = $pdo->prepare("
                         SELECT DISTINCT c.* 
                         FROM clients c
@@ -513,7 +510,6 @@ function handleClients($pdo, $method, $id) {
                     $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
                     sendResponse($stmt->fetchAll());
                 } else {
-                    // Get clients associated with tasks the current user has access to
                     $stmt = $pdo->prepare("
                         SELECT DISTINCT c.* 
                         FROM clients c
@@ -945,12 +941,10 @@ function handleBoard($pdo, $method) {
         }
         $tasks = $stmt->fetchAll();
 
-        // Filter users based on current user's access
         if ($isAdmin) {
             $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
             $users = $stmt->fetchAll();
         } else {
-            // Get users who are part of boards the current user has access to
             $stmt = $pdo->prepare("
                 SELECT DISTINCT u.* 
                 FROM users u
@@ -964,12 +958,10 @@ function handleBoard($pdo, $method) {
             $users = $stmt->fetchAll();
         }
 
-        // Filter clients based on current user's access
         if ($isAdmin) {
             $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
             $clients = $stmt->fetchAll();
         } else {
-            // Get clients associated with tasks the current user has access to
             $stmt = $pdo->prepare("
                 SELECT DISTINCT c.* 
                 FROM clients c

@@ -15,9 +15,7 @@ function loadEnvFile($envPath = null) {
             $line = trim($line);
             if (!empty($line) && strpos($line, '=') !== false && strpos($line, '#') !== 0) {
                 list($key, $value) = explode('=', $line, 2);
-                // Set in $_ENV array for compatibility
                 $_ENV[$key] = $value;
-                // Set using putenv for getenv() access
                 putenv("$key=$value");
             }
         }
@@ -26,6 +24,5 @@ function loadEnvFile($envPath = null) {
     return false;
 }
 
-// Auto-load environment variables when this file is included
 loadEnvFile();
 ?> 

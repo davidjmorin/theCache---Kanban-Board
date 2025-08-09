@@ -7,23 +7,9 @@
  * This file should be included in your main api.php file
  */
 
-// Google API Configuration
-// Get your API key from: https://console.cloud.google.com/
-// Enable these APIs:
-// - Places API
-// - Geocoding API (optional)
-// - Maps JavaScript API (for frontend)
 
-// Option 1: Set as environment variable (recommended)
-// Add this to your server environment or .env file:
-// GOOGLE_API_KEY=your_google_api_key_here
 
-// Option 2: Set directly in this file (less secure)
-// define('GOOGLE_API_KEY', 'your_google_api_key_here');
 
-// Option 3: Set in your web server configuration
-// Apache: SetEnv GOOGLE_API_KEY your_key_here
-// Nginx: fastcgi_param GOOGLE_API_KEY your_key_here
 
 /**
  * Example .env file content:
@@ -57,9 +43,7 @@
  * - Maps JavaScript API: 25,000 map loads/day
  */
 
-// Example of how to include this in your main api.php file:
 /*
-// At the top of api.php, add:
 if (file_exists('api-config.php')) {
     require_once 'api-config.php';
 }

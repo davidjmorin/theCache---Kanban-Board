@@ -95,7 +95,6 @@
         </div>
 
         <?php
-        // Handle form submission
         if ($_POST['action'] ?? false) {
             $apiKey = trim($_POST['api_key'] ?? '');
             $action = $_POST['action'];

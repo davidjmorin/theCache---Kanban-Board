@@ -7,10 +7,8 @@
  * Configuration is loaded from .env file - add your API keys there
  */
 
-// Load environment variables
 require_once __DIR__ . '/api/env_loader.php';
 
-// Google API Configuration from environment variables
 define('GOOGLE_API_KEY', getenv('GOOGLE_API_KEY') ?: '');
 
 /**

@@ -116,7 +116,6 @@ class DashboardApp {
 
     async loadDashboardData() {
         try {
-            // Load all necessary data with individual error handling
             const promises = [
                 this.apiCall('company').catch(e => { console.error('Company data failed:', e); return null; }),
                 this.apiCall('boards').catch(e => { console.error('Boards data failed:', e); return []; }),
@@ -154,31 +153,25 @@ class DashboardApp {
     updateMetrics() {
         const currentUserId = this.currentUser.id;
         
-        // Filter tasks for current user (created by or assigned to)
         const userTasks = this.data.tasks.filter(task => 
             task.created_by == currentUserId || task.user_id == currentUserId
         );
         
-        // Filter boards for current user (created by or shared with)
         const userBoards = this.data.boards.filter(board => 
             board.created_by == currentUserId || board.access_type === 'shared' || board.access_type === 'owner'
         );
         
-        // Filter clients for current user (only clients associated with user's tasks)
         const userTaskClientIds = userTasks.map(task => task.client_id).filter(id => id);
         const userClients = this.data.clients.filter(client => 
             userTaskClientIds.includes(client.id)
         );
         
-        // Filter users for current user (only users who are part of user's boards)
         const userBoardIds = userBoards.map(board => board.id);
         const userBoardUsers = this.data.users.filter(user => {
-            // Include users who have tasks in the user's boards
             const hasTasksInUserBoards = userTasks.some(task => task.user_id == user.id);
             return hasTasksInUserBoards || user.id == currentUserId;
         });
         
-        // Update counts with filtered data
         const totalUsers = userBoardUsers.length;
         document.getElementById('totalUsers').textContent = totalUsers;
 
@@ -191,7 +184,6 @@ class DashboardApp {
         const totalBoards = userBoards.length;
         document.getElementById('totalBoards').textContent = totalBoards;
 
-        // Update active boards (boards with tasks)
         const activeBoards = userBoards.filter(board => {
             const boardTasks = userTasks.filter(task => task.board_id == board.id);
             return boardTasks.length > 0;
@@ -202,7 +194,6 @@ class DashboardApp {
     updateTaskOverview() {
         const currentUserId = this.currentUser.id;
         
-        // Filter tasks for current user (created by or assigned to)
         const userTasks = this.data.tasks.filter(task => 
             task.created_by == currentUserId || task.user_id == currentUserId
         );
@@ -224,7 +215,6 @@ class DashboardApp {
     updateTrends() {
         const currentUserId = this.currentUser.id;
         
-        // Filter data for current user
         const userTasks = this.data.tasks.filter(task => 
             task.created_by == currentUserId || task.user_id == currentUserId
         );
@@ -243,11 +233,9 @@ class DashboardApp {
             return hasTasksInUserBoards || user.id == currentUserId;
         });
         
-        // Calculate trends (simplified - you can make this more sophisticated)
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
 
-        // Users trend (simplified)
         const usersThisMonth = userBoardUsers.filter(user => {
             const userDate = new Date(user.created_at);
             return userDate.getMonth() === currentMonth && userDate.getFullYear() === currentYear;
@@ -256,7 +244,6 @@ class DashboardApp {
         const usersTrend = usersThisMonth > 0 ? `+${usersThisMonth} this month` : 'No change this month';
         document.getElementById('usersTrend').textContent = usersTrend;
 
-        // Clients trend (simplified)
         const clientsThisMonth = userClients.filter(client => {
             const clientDate = new Date(client.created_at);
             return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
@@ -274,7 +261,6 @@ class DashboardApp {
 
         const stats = this.data.opportunityStats;
         
-        // Format currency helper function
         const formatCurrency = (amount) => {
             if (amount >= 1000000) {
                 return `$${(amount / 1000000).toFixed(1)}M`;
@@ -285,19 +271,15 @@ class DashboardApp {
             }
         };
 
-        // Update Won opportunities
         document.getElementById('wonOpportunities').textContent = stats.won?.count || 0;
         document.getElementById('wonRevenue').textContent = formatCurrency(stats.won?.total_revenue || 0);
 
-        // Update Qualified opportunities
         document.getElementById('qualifiedOpportunities').textContent = stats.qualified?.count || 0;
         document.getElementById('qualifiedRevenue').textContent = formatCurrency(stats.qualified?.total_revenue || 0);
 
-        // Update Proposal opportunities
         document.getElementById('proposalOpportunities').textContent = stats.proposal?.count || 0;
         document.getElementById('proposalRevenue').textContent = formatCurrency(stats.proposal?.total_revenue || 0);
 
-        // Update Lost opportunities
         document.getElementById('lostOpportunities').textContent = stats.lost?.count || 0;
         document.getElementById('lostRevenue').textContent = formatCurrency(stats.lost?.total_revenue || 0);
     }
@@ -370,11 +352,9 @@ class DashboardApp {
     }
 
     setupEventListeners() {
-        // Login form
         document.getElementById('loginForm').addEventListener('submit', (e) => this.handleLogin(e));
         document.getElementById('registerForm').addEventListener('submit', (e) => this.handleRegister(e));
         
-        // Form switching
         document.getElementById('showRegisterForm').addEventListener('click', (e) => {
             e.preventDefault();
             this.showRegisterForm();
@@ -384,16 +364,13 @@ class DashboardApp {
             this.showLoginForm();
         });
 
-        // Logout
         document.getElementById('logoutBtn').addEventListener('click', () => this.handleLogout());
 
-        // Search functionality
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
         }
 
-        // Mobile menu
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         if (mobileMenuBtn) {
             mobileMenuBtn.addEventListener('click', () => this.toggleMobileMenu());
@@ -479,7 +456,6 @@ class DashboardApp {
 
     handleSearch(query) {
         if (query.length > 2) {
-            // Implement search functionality
             console.log('Searching for:', query);
         }
     }
@@ -492,7 +468,6 @@ class DashboardApp {
     }
 
     showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.innerHTML = `
@@ -505,15 +480,12 @@ class DashboardApp {
             </button>
         `;
 
-        // Add to page
         document.body.appendChild(notification);
 
-        // Show notification
         setTimeout(() => {
             notification.classList.add('show');
         }, 100);
 
-        // Auto remove after 5 seconds
         setTimeout(() => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -523,7 +495,6 @@ class DashboardApp {
             }, 300);
         }, 5000);
 
-        // Close button functionality
         const closeBtn = notification.querySelector('.notification-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
@@ -538,14 +509,11 @@ class DashboardApp {
     }
 
     showBoardsModal() {
-        // This would open the boards modal - you can implement this based on your existing modal system
         console.log('Opening boards modal');
-        // For now, redirect to the kanban page
         window.location.href = '/kanban.html';
     }
 }
 
-// Initialize the dashboard app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new DashboardApp();
 });

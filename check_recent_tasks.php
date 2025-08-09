@@ -7,7 +7,6 @@ try {
     echo "🔍 Checking Recent Tasks\n";
     echo "=======================\n\n";
     
-    // Check all tasks, not just the first 5
     echo "📋 All Tasks:\n";
     $stmt = $pdo->prepare("SELECT id, title, user_id, created_at FROM tasks ORDER BY id DESC");
     $stmt->execute();

@@ -9,7 +9,6 @@ try {
     
     $taskId = 45;
     
-    // Check all shares for this task
     $stmt = $pdo->prepare("
         SELECT ts.*, u.name as user_name, u.email as user_email, s.name as shared_by_name
         FROM task_shares ts

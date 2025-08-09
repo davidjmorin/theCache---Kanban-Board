@@ -7,7 +7,6 @@ try {
     echo "🔍 Checking Database Data\n";
     echo "========================\n\n";
     
-    // Check users
     echo "👥 Users:\n";
     $stmt = $pdo->prepare("SELECT id, name, email FROM users ORDER BY id");
     $stmt->execute();

@@ -4,7 +4,6 @@ require_once 'api/config.php';
 try {
     $pdo = getConnection();
     
-    // Read and execute the SQL file
     $sql = file_get_contents('api/setup_sharing_tables.sql');
     $pdo->exec($sql);
     

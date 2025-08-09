@@ -4,27 +4,20 @@
  * Run this daily at 5 AM: 0 5 * * * /usr/bin/php /path/to/cron_due_notifications.php
  */
 
-// Set timezone
 date_default_timezone_set('UTC');
 
-// Include database configuration
 require_once 'api/config.php';
 
 try {
-    // Initialize database connection using constants from config
-    // Try socket connection first, then fallback to TCP
     try {
         $pdo = new PDO("mysql:unix_socket=/var/run/mysqld/mysqld.sock;dbname=" . DB_NAME . ";charset=utf8mb4", DB_USER, DB_PASS);
     } catch (Exception $e) {
-        // Fallback to TCP connection
         $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4", DB_USER, DB_PASS);
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // Get current date
     $today = date('Y-m-d');
     
-    // Get tasks that are overdue or upcoming (within next 7 days)
     $stmt = $pdo->prepare("
         SELECT t.*, u.name as user_name, u.email as user_email, c.name as client_name
         FROM tasks t
@@ -44,7 +37,6 @@ try {
         exit(0);
     }
     
-    // Group tasks by user
     $userTasks = [];
     foreach ($dueTasks as $task) {
         $userId = $task['user_id'];
@@ -58,7 +50,6 @@ try {
         $userTasks[$userId]['tasks'][] = $task;
     }
     
-    // Send emails to each user
     $sentCount = 0;
     $failedCount = 0;
     
@@ -81,7 +72,6 @@ try {
 }
 
 function sendDueNotificationEmail($userData) {
-    // Load environment variables
     require_once __DIR__ . '/api/env_loader.php';
     
     $brevoApiKey = getenv('BREVO_API_KEY');

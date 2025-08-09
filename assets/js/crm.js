@@ -13,24 +13,20 @@ class CRMApp {
         await this.loadUsers();
         this.setupEventListeners();
         
-        // Handle URL parameters for client and tab
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('client');
         const tabName = urlParams.get('tab');
         
         if (clientId) {
-            // Find the client and select it
             const client = this.clients.find(c => c.id == clientId);
             if (client) {
                 await this.selectClient(clientId);
                 if (tabName) {
-                    // Switch to the specified tab
                     setTimeout(() => {
                         this.switchTab(tabName);
                     }, 100);
                 }
             } else {
-                // If client not found in loaded clients, try to load it directly
                 try {
                     await this.selectClient(clientId);
                     if (tabName) {
@@ -111,7 +107,6 @@ class CRMApp {
 
             if (formData && method !== 'GET') {
                 options.body = formData;
-                // Don't set Content-Type header - let the browser set it with the boundary
             }
 
             const url = this.apiBase + endpoint;
@@ -242,7 +237,6 @@ class CRMApp {
         
         const fullAddress = this.formatAddress(client);
         
-        // Find primary contact
         const primaryContact = client.contacts ? client.contacts.find(contact => contact.is_primary == 1) : null;
         
         document.getElementById('mainTitle').textContent = client.name;
@@ -362,21 +356,17 @@ class CRMApp {
     }
 
     switchTab(tabName, event = null) {
-        // Remove active class from all tabs and content
         document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.client-tab').forEach(tab => tab.classList.remove('active'));
         
-        // Add active class to selected tab and content
         const tabContent = document.getElementById(tabName + 'Tab');
         if (tabContent) {
             tabContent.classList.add('active');
         }
         
-        // Add active class to the clicked tab button
         if (event && event.target) {
             event.target.classList.add('active');
         } else {
-            // Fallback: find the tab button by onclick attribute
             const tabButton = document.querySelector(`.client-tab[onclick*="${tabName}"]`);
             if (tabButton) {
                 tabButton.classList.add('active');
@@ -823,7 +813,6 @@ class CRMApp {
             
             console.log('Form data:', data);
             
-            // Validate required fields
             if (!data.name || !data.email) {
                 this.showNotification('Name and email are required', 'error');
                 return;
@@ -836,7 +825,6 @@ class CRMApp {
             this.hideNewClientModal();
             this.showNotification('Client created successfully!', 'success');
             
-            // Refresh the client list to show the new client
             await this.refreshClientList();
         } catch (error) {
             console.error('Error creating client:', error);
@@ -873,23 +861,18 @@ class CRMApp {
             document.getElementById('editClassification').value = client.classification || '';
             document.getElementById('editClientNotes').value = client.notes || '';
             
-            // Ensure account manager dropdown is populated before setting the value
             const editAccountManagerSelect = document.getElementById('editAccountManager');
             if (editAccountManagerSelect) {
-                // If users haven't been loaded yet, load them first
                 if (!this.users || this.users.length === 0) {
                     await this.loadUsers();
                 }
                 
-                // Populate the dropdown if it's empty
                 if (editAccountManagerSelect.options.length <= 1) {
                     this.populateAccountManagerDropdown();
                 }
                 
-                // Now set the account manager value - convert to string for comparison
                 const accountManagerId = client.account_manager_id ? String(client.account_manager_id) : '';
                 
-                // Find the option with the matching value
                 let found = false;
                 for (let i = 0; i < editAccountManagerSelect.options.length; i++) {
                     const option = editAccountManagerSelect.options[i];
@@ -935,7 +918,6 @@ class CRMApp {
         if (modalTitle) modalTitle.textContent = 'Add Activity';
         if (submitButton) submitButton.textContent = 'Add Activity';
 
-        // Set data attributes for the form
         const form = document.getElementById('addActivityForm');
         if (form) {
             form.setAttribute('data-client-id', clientId);
@@ -972,7 +954,6 @@ class CRMApp {
             if (modalTitle) modalTitle.textContent = 'Edit Activity';
             if (submitButton) submitButton.textContent = 'Update Activity';
 
-            // Set data attributes for the form
             const form = document.getElementById('addActivityForm');
             if (form) {
                 form.setAttribute('data-client-id', clientId);
@@ -995,7 +976,6 @@ class CRMApp {
             await this.apiCall(`crm-activities&client_id=${clientId}&activity_id=${activityId}`, 'DELETE');
             this.showNotification('Activity deleted successfully!', 'success');
 
-            // Refresh only the activities tab
             await this.refreshActivitiesTab();
         } catch (error) {
             console.error('Error deleting activity:', error);
@@ -1109,7 +1089,6 @@ class CRMApp {
             await this.apiCall(`crm-contacts&client_id=${clientId}&contact_id=${contactId}`, 'DELETE');
             this.showNotification('Contact deleted successfully!', 'success');
 
-            // Refresh only the contacts tab
             await this.refreshContactsTab();
         } catch (error) {
             console.error('Error deleting contact:', error);
@@ -1328,7 +1307,6 @@ class CRMApp {
             await this.apiCall(`crm-todos&client_id=${clientId}&todo_id=${todoId}`, 'DELETE');
             this.showNotification('Todo deleted successfully!', 'success');
 
-            // Refresh only the todos tab
             await this.refreshTodosTab();
         } catch (error) {
             console.error('Error deleting todo:', error);
@@ -1489,7 +1467,6 @@ class CRMApp {
     }
 
     setupEventListeners() {
-        // CSV file input event listener
         const csvFileInput = document.getElementById('csvFile');
         if (csvFileInput) {
             csvFileInput.addEventListener('change', (event) => {
@@ -1497,7 +1474,6 @@ class CRMApp {
             });
         }
 
-        // Skip first row checkbox event listener
         const skipFirstRowCheckbox = document.getElementById('skipFirstRow');
         if (skipFirstRowCheckbox) {
             skipFirstRowCheckbox.addEventListener('change', () => {
@@ -1615,22 +1591,18 @@ class CRMApp {
         }
     }
 
-    // AJAX refresh methods for individual tabs
     async refreshContactsTab() {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update only the contacts tab content
             const contactsTab = document.getElementById('contactsTab');
             if (contactsTab) {
                 contactsTab.innerHTML = this.renderContactsTab(client);
             }
             
-            // Update the contacts count in the tab button
             const contactsTabButton = document.querySelector('.client-tab[onclick*="contacts"]');
             if (contactsTabButton) {
                 contactsTabButton.textContent = `Contacts (${client.contacts?.length || 0})`;
@@ -1644,17 +1616,14 @@ class CRMApp {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update only the todos tab content
             const todosTab = document.getElementById('todosTab');
             if (todosTab) {
                 todosTab.innerHTML = this.renderTodosTab(client);
             }
             
-            // Update the todos count in the tab button
             const todosTabButton = document.querySelector('.client-tab[onclick*="todos"]');
             if (todosTabButton) {
                 todosTabButton.textContent = `To-Dos (${client.todos?.length || 0})`;
@@ -1668,17 +1637,14 @@ class CRMApp {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update only the activities tab content
             const activitiesTab = document.getElementById('activityTab');
             if (activitiesTab) {
                 activitiesTab.innerHTML = this.renderActivityTab(client);
             }
             
-            // Update the activities count in the tab button
             const activitiesTabButton = document.querySelector('.client-tab[onclick*="activity"]');
             if (activitiesTabButton) {
                 activitiesTabButton.textContent = `Activities (${client.activities?.length || 0})`;
@@ -1692,17 +1658,14 @@ class CRMApp {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update only the tasks tab content
             const tasksTab = document.getElementById('tasksTab');
             if (tasksTab) {
                 tasksTab.innerHTML = this.renderTasksTab(client);
             }
             
-            // Update the tasks count in the tab button
             const tasksTabButton = document.querySelector('.client-tab[onclick*="tasks"]');
             if (tasksTabButton) {
                 tasksTabButton.textContent = `Open Tasks (${client.tasks?.length || 0})`;
@@ -1716,17 +1679,14 @@ class CRMApp {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update only the attachments tab content
             const attachmentsTab = document.getElementById('attachmentsTab');
             if (attachmentsTab) {
                 attachmentsTab.innerHTML = this.renderAttachmentsTab(client);
             }
             
-            // Update the attachments count in the tab button
             const attachmentsTabButton = document.querySelector('.client-tab[onclick*="attachments"]');
             if (attachmentsTabButton) {
                 attachmentsTabButton.textContent = `Attachments (${client.attachments?.length || 0})`;
@@ -1744,7 +1704,6 @@ class CRMApp {
         }
     }
 
-    // Enhanced submit functions with AJAX refresh
     async submitEditContact(event) {
         event.preventDefault();
         
@@ -1764,7 +1723,6 @@ class CRMApp {
             this.hideEditContactModal();
             this.showNotification('Contact updated successfully!', 'success');
 
-            // Refresh only the contacts tab
             await this.refreshContactsTab();
         } catch (error) {
             console.error('Error updating contact:', error);
@@ -1791,7 +1749,6 @@ class CRMApp {
             this.hideEditTodoModal();
             this.showNotification('Todo updated successfully!', 'success');
 
-            // Refresh only the todos tab
             await this.refreshTodosTab();
         } catch (error) {
             console.error('Error updating todo:', error);
@@ -1817,7 +1774,6 @@ class CRMApp {
             this.hideAddContactModal();
             this.showNotification('Contact added successfully!', 'success');
             
-            // Refresh only the contacts tab
             await this.refreshContactsTab();
         } catch (error) {
             console.error('Error adding contact:', error);
@@ -1840,7 +1796,6 @@ class CRMApp {
             this.hideAddTodoModal();
             this.showNotification('Todo added successfully!', 'success');
 
-            // Refresh only the todos tab
             await this.refreshTodosTab();
         } catch (error) {
             console.error('Error adding todo:', error);
@@ -1860,18 +1815,15 @@ class CRMApp {
             const data = Object.fromEntries(formData.entries());
 
             if (activityId) {
-                // Update existing activity
                 await this.apiCall(`crm-activities&client_id=${clientId}&activity_id=${activityId}`, 'PUT', data);
                 this.showNotification('Activity updated successfully!', 'success');
             } else {
-                // Add new activity
                 await this.apiCall(`crm-activities&client_id=${clientId}`, 'POST', data);
                 this.showNotification('Activity added successfully!', 'success');
             }
 
             this.hideAddActivityModal();
             
-            // Refresh only the activities tab
             await this.refreshActivitiesTab();
         } catch (error) {
             console.error('Error saving activity:', error);
@@ -1888,7 +1840,6 @@ class CRMApp {
             await this.apiCall(`crm-contacts&client_id=${clientId}&contact_id=${contactId}`, 'DELETE');
             this.showNotification('Contact deleted successfully!', 'success');
 
-            // Refresh only the contacts tab
             await this.refreshContactsTab();
         } catch (error) {
             console.error('Error deleting contact:', error);
@@ -1905,7 +1856,6 @@ class CRMApp {
             await this.apiCall(`crm-todos&client_id=${clientId}&todo_id=${todoId}`, 'DELETE');
             this.showNotification('Todo deleted successfully!', 'success');
 
-            // Refresh only the todos tab
             await this.refreshTodosTab();
         } catch (error) {
             console.error('Error deleting todo:', error);
@@ -1922,7 +1872,6 @@ class CRMApp {
             await this.apiCall(`crm-activities&client_id=${clientId}&activity_id=${activityId}`, 'DELETE');
             this.showNotification('Activity deleted successfully!', 'success');
 
-            // Refresh only the activities tab
             await this.refreshActivitiesTab();
         } catch (error) {
             console.error('Error deleting activity:', error);
@@ -1992,7 +1941,6 @@ class CRMApp {
             this.hideUploadAttachmentModal();
             this.showNotification('Attachment uploaded successfully!', 'success');
 
-            // Refresh only the attachments tab
             await this.refreshAttachmentsTab();
 
         } catch (error) {
@@ -2020,10 +1968,8 @@ class CRMApp {
             this.hideEditClientModal();
             this.showNotification('Client updated successfully!', 'success');
 
-            // Refresh the client list to show updated client
             await this.refreshClientList();
             
-            // If this is the currently selected client, refresh the detail view
             if (this.currentClient && this.currentClient.id == clientId) {
                 await this.refreshAllTabs();
             }
@@ -2033,7 +1979,6 @@ class CRMApp {
         }
     }
 
-    // CSV Upload functionality
     showCsvUploadModal() {
         document.getElementById('csvUploadModal').style.display = 'block';
         this.resetCsvUploadForm();
@@ -2079,7 +2024,6 @@ class CRMApp {
     parseCsv(text) {
         const lines = text.split('\n').filter(line => line.trim());
         return lines.map(line => {
-            // Handle quoted fields and commas within quotes
             const result = [];
             let current = '';
             let inQuotes = false;
@@ -2137,13 +2081,11 @@ class CRMApp {
         const mappingContainer = document.getElementById('csvMappingContainer');
         mappingContainer.style.display = 'block';
 
-        // Clear existing options
         const selects = mappingContainer.querySelectorAll('select');
         selects.forEach(select => {
             select.innerHTML = '<option value="">Select column...</option>';
         });
 
-        // Add header options to each select
         headers.forEach((header, index) => {
             selects.forEach(select => {
                 const option = document.createElement('option');
@@ -2153,7 +2095,6 @@ class CRMApp {
             });
         });
 
-        // Auto-map common column names
         this.autoMapColumns(headers);
     }
 
@@ -2218,7 +2159,6 @@ class CRMApp {
             return;
         }
 
-        // Validate required mappings
         const requiredMappings = ['mapCompanyName'];
         const missingMappings = requiredMappings.filter(id => {
             const select = document.getElementById(id);
@@ -2237,7 +2177,6 @@ class CRMApp {
             const formData = new FormData();
             formData.append('csv_file', file);
             
-            // Add mapping data - use the exact field names from the HTML
             const mappingFields = [
                 { id: 'mapCompanyName', field: 'map_company_name' },
                 { id: 'mapEmail', field: 'map_email' },
@@ -2260,7 +2199,6 @@ class CRMApp {
                 }
             });
 
-            // Add other form data
             formData.append('skip_first_row', document.getElementById('skipFirstRow').checked ? '1' : '0');
 
             const submitBtn = event.target.querySelector('button[type="submit"]');
@@ -2289,7 +2227,6 @@ class CRMApp {
             this.hideCsvUploadModal();
             this.showNotification(`Successfully imported ${result.imported_count} clients!`, 'success');
             
-            // Refresh the client list
             await this.refreshClientList();
 
         } catch (error) {
@@ -2317,7 +2254,6 @@ class CRMApp {
         const editAccountManagerSelect = document.getElementById('editAccountManager');
         
         if (this.users) {
-            // Populate new client modal
             if (accountManagerSelect) {
                 accountManagerSelect.innerHTML = '<option value="">Select Account Manager...</option>';
                 this.users.forEach(user => {
@@ -2328,9 +2264,7 @@ class CRMApp {
                 });
             }
             
-            // Populate edit client modal
             if (editAccountManagerSelect) {
-                // Store the current value before repopulating
                 const currentValue = editAccountManagerSelect.value;
                 
                 editAccountManagerSelect.innerHTML = '<option value="">Select Account Manager...</option>';
@@ -2341,7 +2275,6 @@ class CRMApp {
                     editAccountManagerSelect.appendChild(option);
                 });
                 
-                // Restore the value if it was set
                 if (currentValue) {
                     editAccountManagerSelect.value = currentValue;
                 }
@@ -2349,16 +2282,13 @@ class CRMApp {
         }
     }
 
-    // New method to refresh all tabs for the current client
     async refreshAllTabs() {
         if (!this.currentClient) return;
         
         try {
-            // Fetch updated client data
             const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
             this.currentClient = client;
             
-            // Update all tab contents
             const contactsTab = document.getElementById('contactsTab');
             if (contactsTab) {
                 contactsTab.innerHTML = this.renderContactsTab(client);
@@ -2384,14 +2314,12 @@ class CRMApp {
                 attachmentsTab.innerHTML = this.renderAttachmentsTab(client);
             }
             
-            // Update all tab button counts
             this.updateTabCounts(client);
         } catch (error) {
             console.error('Error refreshing all tabs:', error);
         }
     }
 
-    // New method to update tab counts
     updateTabCounts(client) {
         const contactsTabButton = document.querySelector('.client-tab[onclick*="contacts"]');
         if (contactsTabButton) {
@@ -2419,12 +2347,10 @@ class CRMApp {
         }
     }
 
-    // Contact filtering and export functionality
     filterContactsByStatus() {
         const statusFilter = document.getElementById('contactStatusFilter');
         const status = statusFilter ? statusFilter.value : 'all';
         
-        // Filter table rows
         const contactRows = document.querySelectorAll('#contactsTab tbody tr');
         let visibleCount = 0;
         
@@ -2439,13 +2365,11 @@ class CRMApp {
             } else if (status === 'inactive') {
                 shouldShow = !isActive;
             }
-            // 'all' shows everything
             
             row.style.display = shouldShow ? '' : 'none';
             if (shouldShow) visibleCount++;
         });
         
-        // Filter grid cards
         const contactCards = document.querySelectorAll('#contactsTab .contact-card');
         contactCards.forEach(card => {
             const contactName = card.querySelector('.contact-name')?.textContent || '';
@@ -2458,12 +2382,10 @@ class CRMApp {
             } else if (status === 'inactive') {
                 shouldShow = !isActive;
             }
-            // 'all' shows everything
             
             card.style.display = shouldShow ? '' : 'none';
         });
         
-        // Update the count display
         const countDisplay = document.querySelector('#contactsTab .table-container + div');
         if (countDisplay) {
             countDisplay.textContent = `1 - ${visibleCount} of ${visibleCount}`;
@@ -2478,7 +2400,6 @@ class CRMApp {
                 return;
             }
 
-            // Create CSV content
             const headers = ['Name', 'Email', 'Phone', 'Mobile Phone', 'Position', 'Primary Contact', 'Billing Contact', 'Last Activity'];
             const csvContent = [
                 headers.join(','),
@@ -2494,7 +2415,6 @@ class CRMApp {
                 ].join(','))
             ].join('\n');
 
-            // Create and download file
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -2521,12 +2441,10 @@ class CRMApp {
         
         if (table && grid) {
             if (table.style.display === 'none') {
-                // Switch to table view
                 table.style.display = '';
                 grid.style.display = 'none';
                 this.showNotification('Switched to table view', 'info');
             } else {
-                // Switch to grid view
                 table.style.display = 'none';
                 grid.style.display = 'grid';
                 this.showNotification('Switched to grid view', 'info');
@@ -2822,11 +2740,9 @@ class CRMApp {
         
         try {
             if (assetId) {
-                // Update existing asset
                 await this.apiCall(`assets&id=${assetId}`, 'PUT', data);
                 this.showNotification('Asset updated successfully', 'success');
             } else {
-                // Create new asset
                 await this.apiCall('assets', 'POST', data);
                 this.showNotification('Asset added successfully', 'success');
             }
@@ -2870,7 +2786,6 @@ class CRMApp {
         }
     }
 
-    // Company Search Functionality
     async searchCompany() {
         const searchTerm = document.getElementById('clientName').value.trim();
         if (!searchTerm) {
@@ -2883,7 +2798,6 @@ class CRMApp {
         resultsContainer.style.display = 'block';
         
         try {
-            // Call the company lookup API
             const response = await fetch(`api.php?endpoint=company-lookup&q=${encodeURIComponent(searchTerm)}`, {
                 method: 'GET',
                 headers: {
@@ -2911,7 +2825,6 @@ class CRMApp {
     displayCompanyResults(results) {
         const container = document.getElementById('companySearchResults');
         
-        // Store results globally for selection
         this.companySearchResults = results;
         
         if (results.length === 0) {
@@ -2940,7 +2853,6 @@ class CRMApp {
     }
 
     selectCompany(index) {
-        // Get the selected company data from stored results
         const company = this.companySearchResults[index];
         
         if (!company) {
@@ -2948,29 +2860,24 @@ class CRMApp {
             return;
         }
         
-        // Populate the form fields
         document.getElementById('clientName').value = company.name;
         document.getElementById('clientEmail').value = company.email !== 'N/A' ? company.email : '';
         document.getElementById('clientNumber').value = company.phone !== 'N/A' ? company.phone : '';
         document.getElementById('clientUrl').value = company.website !== 'N/A' ? company.website : '';
         
-        // Parse address if available
         if (company.address && company.address !== 'N/A') {
             this.parseAddress(company.address);
         }
         
-        // Hide the search results
         document.getElementById('companySearchResults').style.display = 'none';
         
         this.showNotification('Company information filled successfully!', 'success');
     }
 
     parseAddress(address) {
-        // Simple address parsing - you might want to improve this
         const addressParts = address.split(',').map(part => part.trim());
         
         if (addressParts.length >= 3) {
-            // Assume format: Street, City, State ZIP
             document.getElementById('address1').value = addressParts[0] || '';
             document.getElementById('city').value = addressParts[1] || '';
             
@@ -2983,7 +2890,6 @@ class CRMApp {
         }
     }
 
-    // TBR Meeting Functions
     renderTbrTab(client) {
         const meetings = client.tbrMeetings || [];
         
@@ -3068,12 +2974,10 @@ class CRMApp {
     }
 
     async showTbrMeetingModal(clientId, meetingId = null) {
-        // Ensure users are loaded before creating the modal
         if (!this.users || this.users.length === 0) {
             await this.loadUsers();
         }
         
-        // If editing, get the meeting data first
         let meetingData = null;
         if (meetingId) {
             try {
@@ -3173,21 +3077,16 @@ class CRMApp {
             </div>
         `;
         
-        // Remove existing modal if present
         const existingModal = document.getElementById('tbrMeetingModal');
         if (existingModal) {
             existingModal.remove();
         }
         
-        // Add modal to body
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // Show modal
         document.getElementById('tbrMeetingModal').style.display = 'block';
         
-        // Load meeting data if editing
         if (meetingId && meetingData) {
-            // Populate form fields
             document.getElementById('meetingDate').value = meetingData.meeting_date;
             document.getElementById('meetingType').value = meetingData.meeting_type;
             document.getElementById('primaryContact').value = meetingData.primary_contact || '';
@@ -3195,11 +3094,9 @@ class CRMApp {
             document.getElementById('meetingNotes').value = meetingData.notes || '';
             document.getElementById('recommendations').value = meetingData.recommendations || '';
             
-            // Clear existing attendees
             const attendeesContainer = document.getElementById('attendeesContainer');
             attendeesContainer.innerHTML = '';
             
-            // Add attendees
             if (meetingData.attendees && meetingData.attendees.length > 0) {
                 meetingData.attendees.forEach(attendee => {
                     const attendeeRow = document.createElement('div');
@@ -3215,7 +3112,6 @@ class CRMApp {
                 });
             }
             
-            // Always add one row with the "+" button at the end
             const addRow = document.createElement('div');
             addRow.className = 'attendee-row';
             addRow.innerHTML = `
@@ -3267,7 +3163,6 @@ class CRMApp {
                 attendees: []
             };
             
-            // Collect attendees
             const names = formData.getAll('attendee_name[]');
             const emails = formData.getAll('attendee_email[]');
             for (let i = 0; i < names.length; i++) {
@@ -3287,7 +3182,6 @@ class CRMApp {
             this.hideTbrMeetingModal();
             this.showNotification(`TBR meeting ${meetingId ? 'updated' : 'created'} successfully!`, 'success');
             
-            // Refresh the client data
             if (this.currentClient) {
                 const updatedClient = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
                 this.showClientDetail(updatedClient);
@@ -3387,16 +3281,13 @@ class CRMApp {
                 </div>
             `;
             
-            // Remove existing modal if present
             const existingModal = document.getElementById('tbrMeetingDetailModal');
             if (existingModal) {
                 existingModal.remove();
             }
             
-            // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal
             document.getElementById('tbrMeetingDetailModal').style.display = 'block';
             
         } catch (error) {
@@ -3417,10 +3308,8 @@ class CRMApp {
             const meeting = await this.apiCall(`tbr-meetings&id=${meetingId}`);
             const clientId = meeting.client_id;
             
-            // Close detail modal if open
             this.hideTbrMeetingDetailModal();
             
-            // Show edit modal
             await this.showTbrMeetingModal(clientId, meetingId);
             
         } catch (error) {
@@ -3482,16 +3371,13 @@ class CRMApp {
                 </div>
             `;
             
-            // Remove existing modal if present
             const existingModal = document.getElementById('tbrAttachmentsModal');
             if (existingModal) {
                 existingModal.remove();
             }
             
-            // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal
             document.getElementById('tbrAttachmentsModal').style.display = 'block';
             
         } catch (error) {
@@ -3566,15 +3452,12 @@ class CRMApp {
         return diffDays;
     }
 
-    // Opportunity Management Methods
     async addOpportunity(clientId) {
         try {
-            // Ensure users are loaded before creating the modal
             if (!this.users || this.users.length === 0) {
                 await this.loadUsers();
             }
             
-            // Double-check that users are loaded
             if (!this.users || this.users.length === 0) {
                 console.warn('No users loaded, attempting to load again...');
                 await this.loadUsers();
@@ -3651,19 +3534,15 @@ class CRMApp {
                 </div>
             `;
             
-            // Remove existing modal if present
             const existingModal = document.getElementById('addOpportunityModal');
             if (existingModal) {
                 existingModal.remove();
             }
             
-            // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal
             document.getElementById('addOpportunityModal').style.display = 'flex';
             
-            // If users weren't loaded properly, try to reload them and update the dropdown
             if (!this.users || this.users.length === 0) {
                 setTimeout(async () => {
                     await this.loadUsers();
@@ -3693,17 +3572,14 @@ class CRMApp {
         try {
             const opportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
             if (opportunity) {
-                // Ensure users are loaded
                 if (!this.users || this.users.length === 0) {
                     await this.loadUsers();
                 }
                 
-                // First, create the modal if it doesn't exist
                 if (!document.getElementById('addOpportunityModal')) {
                     await this.addOpportunity(clientId);
                 }
                 
-                // Populate the form with existing data
                 document.getElementById('opportunityId').value = opportunity.id;
                 document.getElementById('opportunityTitle').value = opportunity.title || '';
                 document.getElementById('opportunityDescription').value = opportunity.description || '';
@@ -3712,7 +3588,6 @@ class CRMApp {
                 document.getElementById('opportunityStatus').value = opportunity.status || 'new';
                 document.getElementById('opportunityCloseDate').value = opportunity.close_date || '';
                 
-                // Populate the owner dropdown
                 const ownerSelect = document.getElementById('opportunityOwner');
                 if (ownerSelect) {
                     ownerSelect.innerHTML = '<option value="">Select Owner</option>';
@@ -3729,10 +3604,8 @@ class CRMApp {
                     }
                 }
                 
-                // Update modal title
                 document.querySelector('#addOpportunityModal .modal-header h2').textContent = 'Edit Opportunity';
                 
-                // Show modal
                 document.getElementById('addOpportunityModal').style.display = 'flex';
             }
         } catch (error) {
@@ -3745,7 +3618,6 @@ class CRMApp {
         try {
             const opportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
             if (opportunity) {
-                // Fetch notes for this opportunity
                 let notes = [];
                 try {
                     notes = await this.apiCall(`opportunity-notes&opportunity_id=${opportunityId}`);
@@ -3754,7 +3626,6 @@ class CRMApp {
                     notes = [];
                 }
                 
-                // Fetch attachments for this opportunity
                 let attachments = [];
                 try {
                     attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
@@ -3763,7 +3634,6 @@ class CRMApp {
                     attachments = [];
                 }
                 
-                // Add notes and attachments to the opportunity object
                 opportunity.notes = notes;
                 opportunity.attachments = attachments;
                 
@@ -3983,16 +3853,13 @@ class CRMApp {
                     </div>
                 `;
                 
-                // Remove existing modal if present
                 const existingModal = document.getElementById('viewOpportunityModal');
                 if (existingModal) {
                     existingModal.remove();
                 }
                 
-                // Add modal to body
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
                 
-                // Show modal
                 document.getElementById('viewOpportunityModal').style.display = 'flex';
             }
         } catch (error) {
@@ -4039,11 +3906,9 @@ class CRMApp {
         
         try {
             if (opportunityId) {
-                // Update existing opportunity
                 await this.apiCall(`opportunities&id=${opportunityId}`, 'PUT', opportunityData);
                 this.showNotification('Opportunity updated successfully', 'success');
             } else {
-                // Create new opportunity
                 await this.apiCall('opportunities', 'POST', opportunityData);
                 this.showNotification('Opportunity created successfully', 'success');
             }
@@ -4078,7 +3943,6 @@ class CRMApp {
                 currentClient.opportunities = opportunities;
                 this.renderOpportunitiesTab(currentClient);
                 
-                // Update the opportunities tab content
                 const opportunitiesTab = document.getElementById('opportunitiesTab');
                 if (opportunitiesTab) {
                     opportunitiesTab.innerHTML = this.renderOpportunitiesTab(currentClient);
@@ -4118,16 +3982,13 @@ class CRMApp {
                 </div>
             `;
             
-            // Remove existing modal if present
             const existingModal = document.getElementById('addOpportunityNoteModal');
             if (existingModal) {
                 existingModal.remove();
             }
             
-            // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal
             document.getElementById('addOpportunityNoteModal').style.display = 'flex';
         } catch (error) {
             console.error('Failed to show add note modal:', error);
@@ -4173,16 +4034,13 @@ class CRMApp {
                 </div>
             `;
             
-            // Remove existing modal if present
             const existingModal = document.getElementById('addOpportunityAttachmentModal');
             if (existingModal) {
                 existingModal.remove();
             }
             
-            // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal
             document.getElementById('addOpportunityAttachmentModal').style.display = 'flex';
         } catch (error) {
             console.error('Failed to show add attachment modal:', error);
@@ -4224,14 +4082,11 @@ class CRMApp {
             this.showNotification('Note added successfully', 'success');
             this.hideAddOpportunityNoteModal();
             
-            // Refresh the notes list by fetching the latest notes
             const notes = await this.apiCall(`opportunity-notes&opportunity_id=${opportunityId}`);
             
-            // Update the notes section in the modal
             const notesContainer = document.querySelector('.notes-list');
             if (notesContainer) {
                 if (notes && notes.length > 0) {
-                    // Clear existing notes and add all notes including the new one
                     notesContainer.innerHTML = notes.map(note => `
                         <div class="note-item">
                             <div class="note-header">
@@ -4251,7 +4106,6 @@ class CRMApp {
                 }
             }
             
-            // Update the notes count in the stats section
             const notesCountStat = document.querySelector('.stat-item:nth-child(2) .stat-value');
             if (notesCountStat) {
                 notesCountStat.textContent = notes ? notes.length : 0;
@@ -4293,10 +4147,8 @@ class CRMApp {
             this.showNotification('Attachment uploaded successfully', 'success');
             this.hideAddOpportunityAttachmentModal();
             
-            // Refresh the attachments list by fetching the latest attachments
             const attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
             
-            // Update the attachments list in the modal
             const attachmentsContainer = document.querySelector('.attachments-list');
             if (attachmentsContainer) {
                 if (attachments && attachments.length > 0) {
@@ -4335,7 +4187,6 @@ class CRMApp {
                 }
             }
             
-            // Update the attachments count in the stats section
             const attachmentsStat = document.querySelector('.stat-item:last-child .stat-value');
             if (attachmentsStat) {
                 attachmentsStat.textContent = attachments ? attachments.length : 0;
@@ -4385,13 +4236,10 @@ class CRMApp {
             
             this.showNotification('Attachment deleted successfully', 'success');
             
-            // Refresh the opportunity view to update the attachments list
             const currentOpportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
             if (currentOpportunity) {
-                // Refresh the attachments list
                 const attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
                 
-                // Update the attachments list in the modal
                 const attachmentsContainer = document.querySelector('.attachments-list');
                 if (attachmentsContainer) {
                     if (attachments && attachments.length > 0) {
@@ -4430,7 +4278,6 @@ class CRMApp {
                     }
                 }
                 
-                // Update the attachments count in the stats section
                 const attachmentsStat = document.querySelector('.stat-item:last-child .stat-value');
                 if (attachmentsStat) {
                     attachmentsStat.textContent = attachments ? attachments.length : 0;

@@ -7,7 +7,6 @@ try {
     echo "🔧 Fixing Tasks Without Owners\n";
     echo "==============================\n\n";
     
-    // Check for tasks without owners
     $stmt = $pdo->prepare("SELECT id, title, user_id FROM tasks WHERE user_id IS NULL");
     $stmt->execute();
     $tasksWithoutOwners = $stmt->fetchAll();
@@ -24,7 +23,6 @@ try {
     
     echo "\n🔧 Fixing tasks...\n";
     
-    // Get the first available user as default owner
     $stmt = $pdo->prepare("SELECT id, name FROM users WHERE is_active != 0 ORDER BY id LIMIT 1");
     $stmt->execute();
     $defaultUser = $stmt->fetch();
@@ -36,14 +34,12 @@ try {
     
     echo "👤 Using default owner: {$defaultUser['name']} (ID: {$defaultUser['id']})\n\n";
     
-    // Update tasks without owners
     $stmt = $pdo->prepare("UPDATE tasks SET user_id = ? WHERE user_id IS NULL");
     $stmt->execute([$defaultUser['id']]);
     $updatedCount = $stmt->rowCount();
     
     echo "✅ Updated {$updatedCount} tasks with default owner\n";
     
-    // Verify the fix
     $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM tasks WHERE user_id IS NULL");
     $stmt->execute();
     $remaining = $stmt->fetch()['count'];

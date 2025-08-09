@@ -288,7 +288,6 @@ function handleLogin($pdo, $method) {
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['is_admin'] = (bool)$user['is_admin'];
     
-    // Generate CSRF token for the session
     $csrfToken = generateCSRFToken();
 
     sendResponse([
@@ -314,7 +313,6 @@ function handleRegister($pdo, $method) {
         
         validateRequired($data, ['name', 'email', 'password']);
         
-        // Sanitize input data
         $data['name'] = sanitizeInput($data['name']);
         $data['email'] = filter_var(trim($data['email']), FILTER_SANITIZE_EMAIL);
         
@@ -328,7 +326,6 @@ function handleRegister($pdo, $method) {
             sendResponse(['error' => 'Email already registered'], 409);
         }
 
-        // Enhanced password validation
         $password = $data['password'];
         $errors = [];
         
@@ -449,7 +446,6 @@ function handleStages($pdo, $method, $id) {
                         sendResponse(['error' => 'Board ID required'], 400);
                     }
 
-                    // Check if board exists first
                     $stmt = $pdo->prepare("SELECT * FROM boards WHERE id = ?");
                     $stmt->execute([$boardId]);
                     $board = $stmt->fetch();
@@ -458,8 +454,6 @@ function handleStages($pdo, $method, $id) {
                         sendResponse(['error' => 'Board not found'], 404);
                     }
                     
-                    // For now, allow access if board exists and user is authenticated
-                    // TODO: Implement proper board access controls later
                     $boardAccess = $board;
 
                     $stmt = $pdo->prepare("SELECT * FROM stages WHERE board_id = ? ORDER BY position");
@@ -619,7 +613,6 @@ function handleTasks($pdo, $method, $id) {
                     $boardId = $_GET['board_id'] ?? null;
                     
                     if (!$boardId) {
-                        // If no board_id provided, get all tasks for the user
                         $stmt = $pdo->prepare("
                             SELECT DISTINCT t.*, u.name as user_name, c.name as client_name,
                                    COUNT(DISTINCT a.id) as attachment_count,
@@ -640,7 +633,6 @@ function handleTasks($pdo, $method, $id) {
                         ");
                         $stmt->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
                     } else {
-                        // Check board access
                         $stmt = $pdo->prepare("
                             SELECT b.*, 
                                    CASE WHEN b.created_by = ? THEN 'owner' 
@@ -685,13 +677,11 @@ function handleTasks($pdo, $method, $id) {
                 $data = getRequestBody();
                 validateRequired($data, ['title', 'stage_id', 'board_id']);
                 
-                // Validate CSRF token for POST requests
                 $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
                 if ($csrfToken) {
                     validateCSRFToken($csrfToken);
                 }
                 
-                // Sanitize input data
                 $data['title'] = sanitizeInput($data['title']);
                 $data['description'] = sanitizeInput($data['description'] ?? '');
                 $data['stage_id'] = (int)$data['stage_id'];
@@ -768,10 +758,8 @@ function handleTasks($pdo, $method, $id) {
                     sendResponse(['error' => 'Task not found'], 404);
                 }
 
-                // Use the new board_id from the request data if provided, otherwise use the current board_id
                 $boardIdToCheck = isset($data['board_id']) ? $data['board_id'] : $task['board_id'];
 
-                // For task updates, allow if user owns the task or has access to the target board
                 $stmt = $pdo->prepare("
                     SELECT b.*, 
                            CASE WHEN b.created_by = ? THEN 'owner' 
@@ -785,9 +773,7 @@ function handleTasks($pdo, $method, $id) {
                 $stmt->execute([$_SESSION['user_id'], $_SESSION['user_id'], $boardIdToCheck, $_SESSION['user_id'], $_SESSION['user_id']]);
                 $board = $stmt->fetch();
 
-                // If user doesn't have access to the target board, check if they own the task
                 if (!$board) {
-                    // Check if the current user owns the task
                     $stmt = $pdo->prepare("SELECT user_id FROM tasks WHERE id = ?");
                     $stmt->execute([$id]);
                     $taskOwner = $stmt->fetch();
@@ -1087,7 +1073,6 @@ function handleBoards($pdo, $method, $id) {
                     $stmt->execute([$userId, $userId, $userId, $userId]);
                     $boards = $stmt->fetchAll();
                     
-                    // If no boards exist and this is for the current user, create a default board
                     if (empty($boards) && $userId == $_SESSION['user_id']) {
                         try {
                             $stmt = $pdo->prepare("INSERT INTO boards (name, description, color, icon, is_active, created_by) VALUES (?, ?, ?, ?, ?, ?)");
@@ -1107,7 +1092,6 @@ function handleBoards($pdo, $method, $id) {
                             $defaultBoard['access_type'] = 'owner';
                             $boards = [$defaultBoard];
                         } catch (PDOException $e) {
-                            // If we can't create a default board, return empty array
                             $boards = [];
                         }
                     }
@@ -1452,22 +1436,18 @@ function handleAttachments($pdo, $method, $id) {
                 sendResponse(['error' => 'File upload failed'], 400);
             }
 
-            // File upload security validation
             $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx'];
             $maxFileSize = 10 * 1024 * 1024; // 10MB
             $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             
-            // Validate file type
             if (!in_array($extension, $allowedTypes)) {
                 sendResponse(['error' => 'Invalid file type. Allowed types: ' . implode(', ', $allowedTypes)], 400);
             }
             
-            // Validate file size
             if ($file['size'] > $maxFileSize) {
                 sendResponse(['error' => 'File too large. Maximum size: 10MB'], 400);
             }
             
-            // Validate MIME type
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mimeType = finfo_file($finfo, $file['tmp_name']);
             finfo_close($finfo);
@@ -1699,7 +1679,6 @@ function handleBoard($pdo, $method) {
 
         $currentUser = getCurrentUser();
         
-        // Check if board exists first
         $stmt = $pdo->prepare("SELECT * FROM boards WHERE id = ?");
         $stmt->execute([$boardId]);
         $board = $stmt->fetch();
@@ -1708,8 +1687,6 @@ function handleBoard($pdo, $method) {
             sendResponse(['error' => 'Board not found'], 404);
         }
         
-        // For now, allow access if user is authenticated and board exists
-        // TODO: Implement proper board access controls later
         $boardAccess = $board;
 
         $stmt = $pdo->prepare("
@@ -2669,14 +2646,12 @@ function handleCrmClient($pdo, $method, $id) {
                     $assets = [];
                 }
                 
-                // Get opportunities
                 try {
                     $opportunities = getClientOpportunities($pdo, $id);
                 } catch (Exception $e) {
                     $opportunities = [];
                 }
                 
-                // Get TBR meetings
                 try {
                     $tbrMeetings = getClientTbrMeetings($pdo, $id);
                     $client['tbrMeetings'] = $tbrMeetings;
@@ -3073,7 +3048,6 @@ function handleCrmAttachments($pdo, $method, $clientId) {
                     sendResponse(['error' => 'File type not allowed'], 400);
                 }
                 
-                // Validate MIME type for additional security
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 $mimeType = finfo_file($finfo, $file['tmp_name']);
                 finfo_close($finfo);
@@ -3317,11 +3291,9 @@ function handleCrmCsvImport() {
     }
 
     try {
-        // Debug: Log received data
         error_log('CSV Import - POST data: ' . print_r($_POST, true));
         error_log('CSV Import - FILES data: ' . print_r($_FILES, true));
         
-        // Check if file was uploaded
         if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
             sendResponse(['error' => 'No CSV file uploaded or upload error'], 400);
             return;
@@ -3329,27 +3301,23 @@ function handleCrmCsvImport() {
 
         $file = $_FILES['csv_file'];
         
-        // Validate file type
         $allowedTypes = ['text/csv', 'text/plain', 'application/csv'];
         if (!in_array($file['type'], $allowedTypes) && !str_ends_with($file['name'], '.csv')) {
             sendResponse(['error' => 'Invalid file type. Please upload a CSV file.'], 400);
             return;
         }
 
-        // Validate file size (10MB max)
         if ($file['size'] > 10 * 1024 * 1024) {
             sendResponse(['error' => 'File size must be less than 10MB'], 400);
             return;
         }
 
-        // Read CSV file
         $csvContent = file_get_contents($file['tmp_name']);
         if ($csvContent === false) {
             sendResponse(['error' => 'Failed to read CSV file'], 500);
             return;
         }
 
-        // Parse CSV
         $lines = explode("\n", $csvContent);
         $lines = array_filter($lines, function($line) {
             return trim($line) !== '';
@@ -3360,7 +3328,6 @@ function handleCrmCsvImport() {
             return;
         }
 
-        // Get mapping from form data
         $mappings = [
             'company_name' => $_POST['map_company_name'] ?? null,
             'email' => $_POST['map_email'] ?? null,
@@ -3374,10 +3341,8 @@ function handleCrmCsvImport() {
             'company_type' => $_POST['map_company_type'] ?? null,
         ];
 
-        // Debug: Log mappings
         error_log('CSV Import - Mappings: ' . print_r($mappings, true));
 
-        // Validate required mapping
         if (!$mappings['company_name']) {
             error_log('CSV Import - Company name mapping is missing');
             sendResponse(['error' => 'Company name mapping is required'], 400);
@@ -3390,7 +3355,6 @@ function handleCrmCsvImport() {
         $importedCount = 0;
         $errors = [];
 
-        // Begin transaction
         $pdo->beginTransaction();
 
         try {
@@ -3400,7 +3364,6 @@ function handleCrmCsvImport() {
                 
                 if (count($row) < 1) continue;
 
-                // Extract data based on mappings
                 $clientData = [
                     'name' => $mappings['company_name'] !== null ? trim($row[$mappings['company_name']]) : '',
                     'email' => $mappings['email'] !== null ? trim($row[$mappings['email']]) : '',
@@ -3414,18 +3377,15 @@ function handleCrmCsvImport() {
                     'company_type' => $mappings['company_type'] !== null ? trim($row[$mappings['company_type']]) : 'customer',
                 ];
 
-                // Validate required fields
                 if (empty($clientData['name'])) {
                     $errors[] = "Row " . ($i + 1) . ": Company name is required";
                     continue;
                 }
 
-                // Set default values
                 $clientData['status'] = 'active';
                 $clientData['company_category'] = 'Standard';
                 $clientData['country'] = 'United States';
 
-                // Insert client
                 $stmt = $pdo->prepare("
                     INSERT INTO clients (
                         name, email, contact_number, url, address_1, city, state, 
@@ -3454,7 +3414,6 @@ function handleCrmCsvImport() {
                 $importedCount++;
             }
 
-            // Commit transaction
             $pdo->commit();
 
             sendResponse([
@@ -3464,7 +3423,6 @@ function handleCrmCsvImport() {
             ]);
 
         } catch (Exception $e) {
-            // Rollback transaction
             $pdo->rollBack();
             sendResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
         }
@@ -3490,7 +3448,6 @@ function handleCrmUsers($pdo, $method) {
 }
 
 function handleNotes($pdo, $method, $id) {
-    // Ensure user is authenticated
     if (!isset($_SESSION['user_id'])) {
         sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
     }
@@ -3500,7 +3457,6 @@ function handleNotes($pdo, $method, $id) {
     switch ($method) {
         case 'GET':
             if ($id) {
-                // Get specific note
                 $stmt = $pdo->prepare("
                     SELECT n.*, c.name as client_name, t.title as task_title, u.name as user_name
                     FROM notes n
@@ -3518,7 +3474,6 @@ function handleNotes($pdo, $method, $id) {
                 
                 sendResponse($note);
             } else {
-                // Get all notes for user with filters
                 $filters = $_GET;
                 $whereConditions = ['n.user_id = ?'];
                 $params = [$userId];
@@ -3572,7 +3527,6 @@ function handleNotes($pdo, $method, $id) {
                 
                 validateRequired($data, ['title']);
                 
-                // Sanitize input
                 $data['title'] = sanitizeInput($data['title']);
                 $data['content'] = isset($data['content']) ? sanitizeInput($data['content']) : '';
                 $data['tags'] = isset($data['tags']) ? sanitizeInput($data['tags']) : null;
@@ -3616,7 +3570,6 @@ function handleNotes($pdo, $method, $id) {
                 
                 validateRequired($data, ['title']);
                 
-                // Check if user owns the note
                 $stmt = $pdo->prepare("SELECT user_id FROM notes WHERE id = ?");
                 $stmt->execute([$id]);
                 $note = $stmt->fetch();
@@ -3625,7 +3578,6 @@ function handleNotes($pdo, $method, $id) {
                     sendResponse(['error' => 'Note not found or access denied'], 404);
                 }
                 
-                // Sanitize input
                 $data['title'] = sanitizeInput($data['title']);
                 $data['content'] = isset($data['content']) ? sanitizeInput($data['content']) : '';
                 $data['tags'] = isset($data['tags']) ? sanitizeInput($data['tags']) : null;
@@ -3658,7 +3610,6 @@ function handleNotes($pdo, $method, $id) {
                 sendResponse(['error' => 'Note ID required'], 400);
             }
             
-            // Check if user owns the note
             $stmt = $pdo->prepare("SELECT user_id FROM notes WHERE id = ?");
             $stmt->execute([$id]);
             $note = $stmt->fetch();
@@ -3679,7 +3630,6 @@ function handleNotes($pdo, $method, $id) {
 }
 
 function handleNoteLinks($pdo, $method, $id) {
-    // Ensure user is authenticated
     if (!isset($_SESSION['user_id'])) {
         sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
     }
@@ -3692,7 +3642,6 @@ function handleNoteLinks($pdo, $method, $id) {
                 sendResponse(['error' => 'Note ID required'], 400);
             }
             
-            // Get linked notes
             $stmt = $pdo->prepare("
                 SELECT nl.*, n.title as target_note_title
                 FROM note_links nl
@@ -3709,7 +3658,6 @@ function handleNoteLinks($pdo, $method, $id) {
             $data = getRequestBody();
             validateRequired($data, ['source_note_id', 'target_note_id']);
             
-            // Check if user owns both notes
             $stmt = $pdo->prepare("SELECT user_id FROM notes WHERE id IN (?, ?)");
             $stmt->execute([$data['source_note_id'], $data['target_note_id']]);
             $notes = $stmt->fetchAll();
@@ -3748,14 +3696,12 @@ function handleNoteLinks($pdo, $method, $id) {
 }
 
 function handleAssets($pdo, $method, $id) {
-    // Ensure user is authenticated
     if (!isset($_SESSION['user_id'])) {
         sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
     }
     
     $userId = $_SESSION['user_id'];
     
-    // Create assets table if it doesn't exist
     $pdo->exec("CREATE TABLE IF NOT EXISTS assets (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -3780,7 +3726,6 @@ function handleAssets($pdo, $method, $id) {
     switch ($method) {
         case 'GET':
             if ($id) {
-                // Get specific asset
                 $stmt = $pdo->prepare("
                     SELECT a.*, u.name as created_by_name
                     FROM assets a
@@ -3796,13 +3741,11 @@ function handleAssets($pdo, $method, $id) {
                 
                 sendResponse($asset);
             } else {
-                // Get assets for a client
                 $clientId = $_GET['client_id'] ?? null;
                 if (!$clientId) {
                     sendResponse(['error' => 'Client ID required'], 400);
                 }
                 
-                // Check if user has access to this client
                 $stmt = $pdo->prepare("SELECT id FROM clients WHERE id = ?");
                 $stmt->execute([$clientId]);
                 if (!$stmt->fetch()) {
@@ -3827,7 +3770,6 @@ function handleAssets($pdo, $method, $id) {
             $data = getRequestBody();
             validateRequired($data, ['client_id', 'name', 'type']);
             
-            // Check if user has access to this client
             $stmt = $pdo->prepare("SELECT id FROM clients WHERE id = ?");
             $stmt->execute([$data['client_id']]);
             if (!$stmt->fetch()) {
@@ -3860,7 +3802,6 @@ function handleAssets($pdo, $method, $id) {
             
             $assetId = $pdo->lastInsertId();
             
-            // Get the created asset
             $stmt = $pdo->prepare("
                 SELECT a.*, u.name as created_by_name
                 FROM assets a
@@ -3881,7 +3822,6 @@ function handleAssets($pdo, $method, $id) {
             $data = getRequestBody();
             validateRequired($data, ['name', 'type']);
             
-            // Check if asset exists and user has access
             $stmt = $pdo->prepare("
                 SELECT a.*, c.id as client_id 
                 FROM assets a 
@@ -3919,7 +3859,6 @@ function handleAssets($pdo, $method, $id) {
                 $id
             ]);
             
-            // Get the updated asset
             $stmt = $pdo->prepare("
                 SELECT a.*, u.name as created_by_name
                 FROM assets a
@@ -3937,7 +3876,6 @@ function handleAssets($pdo, $method, $id) {
                 sendResponse(['error' => 'Asset ID required'], 400);
             }
             
-            // Check if asset exists
             $stmt = $pdo->prepare("SELECT id FROM assets WHERE id = ?");
             $stmt->execute([$id]);
             if (!$stmt->fetch()) {
@@ -3968,7 +3906,6 @@ function handleCompanyLookup($pdo, $method) {
     error_log('Company lookup request for: ' . $searchTerm);
     
     try {
-        // Search using Google Places API for businesses
         error_log('Searching Google Places API...');
         $results = searchGooglePlaces($searchTerm);
         error_log('Google Places returned ' . count($results) . ' results');
@@ -3984,13 +3921,11 @@ function handleCompanyLookup($pdo, $method) {
 
 function handleTbrMeetings($pdo, $method, $id) {
     try {
-        // Create tables if they don't exist
         createTbrTables($pdo);
         
         switch ($method) {
             case 'GET':
                 if ($id) {
-                    // Get specific meeting
                     $stmt = $pdo->prepare("
                         SELECT m.*, c.name as client_name, u.name as account_manager_name
                         FROM tbr_meetings m
@@ -4005,7 +3940,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                         sendResponse(['error' => 'Meeting not found'], 404);
                     }
                     
-                    // Get attendees
                     $stmt = $pdo->prepare("
                         SELECT a.*, u.name as user_name, u.email as user_email
                         FROM tbr_attendees a
@@ -4015,7 +3949,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                     $stmt->execute([$id]);
                     $meeting['attendees'] = $stmt->fetchAll();
                     
-                    // Get attachments
                     $stmt = $pdo->prepare("
                         SELECT * FROM tbr_attachments 
                         WHERE meeting_id = ? 
@@ -4026,15 +3959,12 @@ function handleTbrMeetings($pdo, $method, $id) {
                     
                     sendResponse($meeting);
                 } else {
-                    // Get all meetings for client
                     $clientId = $_GET['client_id'] ?? null;
                     if (!$clientId) {
                         sendResponse(['error' => 'Client ID required'], 400);
                     }
                     
-                    // Check if export is requested
                     if (isset($_GET['export']) && $_GET['export'] === 'true') {
-                        // Export as CSV
                         $stmt = $pdo->prepare("
                             SELECT m.*, c.name as client_name, u.name as account_manager_name
                             FROM tbr_meetings m
@@ -4046,7 +3976,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                         $stmt->execute([$clientId]);
                         $meetings = $stmt->fetchAll();
                         
-                        // Get attendees for each meeting
                         foreach ($meetings as &$meeting) {
                             $stmt = $pdo->prepare("
                                 SELECT a.*, u.name as user_name, u.email as user_email
@@ -4058,15 +3987,12 @@ function handleTbrMeetings($pdo, $method, $id) {
                             $meeting['attendees'] = $stmt->fetchAll();
                         }
                         
-                        // Generate CSV
                         $csv = generateTbrMeetingsCsv($meetings);
                         
-                        // Clear any existing output and headers
                         if (ob_get_level()) {
                             ob_end_clean();
                         }
                         
-                        // Set headers for CSV download
                         header('Content-Type: text/csv; charset=utf-8');
                         header('Content-Disposition: attachment; filename="tbr-meetings-' . $clientId . '-' . date('Y-m-d') . '.csv"');
                         header('Cache-Control: no-cache, must-revalidate');
@@ -4094,7 +4020,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                 $data = getRequestBody();
                 validateRequired($data, ['client_id', 'meeting_date', 'meeting_type']);
                 
-                // If no account manager is specified, set the current user as the account manager
                 $accountManagerId = $data['account_manager_id'] ?? $_SESSION['user_id'];
                 
                 $stmt = $pdo->prepare("
@@ -4119,7 +4044,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                 
                 $meetingId = $pdo->lastInsertId();
                 
-                // Add attendees if provided
                 if (!empty($data['attendees'])) {
                     foreach ($data['attendees'] as $attendee) {
                         $stmt = $pdo->prepare("
@@ -4164,13 +4088,10 @@ function handleTbrMeetings($pdo, $method, $id) {
                     $id
                 ]);
                 
-                // Handle attendees - first delete existing attendees, then add new ones
                 if (isset($data['attendees'])) {
-                    // Delete existing attendees
                     $stmt = $pdo->prepare("DELETE FROM tbr_attendees WHERE meeting_id = ?");
                     $stmt->execute([$id]);
                     
-                    // Add new attendees
                     if (!empty($data['attendees'])) {
                         foreach ($data['attendees'] as $attendee) {
                             $stmt = $pdo->prepare("
@@ -4195,7 +4116,6 @@ function handleTbrMeetings($pdo, $method, $id) {
                     sendResponse(['error' => 'Meeting ID required'], 400);
                 }
                 
-                // Delete related records first
                 $pdo->prepare("DELETE FROM tbr_attendees WHERE meeting_id = ?")->execute([$id]);
                 $pdo->prepare("DELETE FROM tbr_attachments WHERE meeting_id = ?")->execute([$id]);
                 $pdo->prepare("DELETE FROM tbr_meetings WHERE id = ?")->execute([$id]);
@@ -4217,14 +4137,12 @@ function handleUpcomingTbrMeetings($pdo, $method) {
     }
     
     try {
-        // Check if user is authenticated
         if (!isset($_SESSION['user_id'])) {
             sendResponse(['error' => 'Authentication required', 'auth_required' => true], 401);
         }
         
         $userId = $_SESSION['user_id'];
         
-        // Get upcoming TBR meetings where the current user is the account manager
         $stmt = $pdo->prepare("
             SELECT m.*, c.name as client_name, c.contact_name as client_contact_name,
                    u.name as account_manager_name, u.email as account_manager_email
@@ -4240,7 +4158,6 @@ function handleUpcomingTbrMeetings($pdo, $method) {
         $stmt->execute([$userId]);
         $meetings = $stmt->fetchAll();
         
-        // Get attendees for each meeting
         foreach ($meetings as &$meeting) {
             $stmt = $pdo->prepare("
                 SELECT a.*, u.name as user_name, u.email as user_email
@@ -4260,10 +4177,8 @@ function handleUpcomingTbrMeetings($pdo, $method) {
 }
 
 function searchGooglePlaces($searchTerm) {
-    // Try multiple ways to get the API key
     $apiKey = getenv('GOOGLE_API_KEY') ?: $_ENV['GOOGLE_API_KEY'] ?? '';
     
-    // If still empty, try to get from a config file
     if (empty($apiKey) && file_exists('api-config.php')) {
         include 'api-config.php';
         $apiKey = defined('GOOGLE_API_KEY') ? GOOGLE_API_KEY : '';
@@ -4275,40 +4190,32 @@ function searchGooglePlaces($searchTerm) {
     }
     
     try {
-        // Clean the search term
         $cleanSearchTerm = trim($searchTerm);
         
-        // Check if it looks like a phone number
         $isPhoneNumber = preg_match('/^\d{10,}$/', preg_replace('/[^0-9]/', '', $cleanSearchTerm));
         
         $results = [];
         
         if ($isPhoneNumber) {
-            // For phone numbers, try multiple search strategies
             $phoneNumber = preg_replace('/[^0-9]/', '', $cleanSearchTerm);
             
-            // Strategy 1: Search for the phone number directly
             $results = searchWithQuery($apiKey, $phoneNumber, 'phone_direct');
             
-            // Strategy 2: If no results, try searching with area code
             if (empty($results) && strlen($phoneNumber) >= 10) {
                 $areaCode = substr($phoneNumber, 0, 3);
                 $results = searchWithQuery($apiKey, $areaCode . ' ' . substr($phoneNumber, 3), 'phone_area');
             }
             
-            // Strategy 3: If still no results, try searching as a business name
             if (empty($results)) {
                 $results = searchWithQuery($apiKey, $phoneNumber . ' business', 'phone_business');
             }
             
-            // Strategy 4: If still no results, try searching for businesses in the area code
             if (empty($results) && strlen($phoneNumber) >= 10) {
                 $areaCode = substr($phoneNumber, 0, 3);
                 $results = searchWithQuery($apiKey, $areaCode . ' business', 'phone_area_business');
             }
             
         } else {
-            // For company names, search normally
             $results = searchWithQuery($apiKey, $cleanSearchTerm . ' company business', 'company');
         }
         
@@ -4323,7 +4230,6 @@ function searchGooglePlaces($searchTerm) {
 
 function searchWithQuery($apiKey, $query, $searchType) {
     try {
-        // Search for businesses using Google Places API
         $searchUrl = 'https://maps.googleapis.com/maps/api/place/textsearch/json?' . http_build_query([
             'query' => $query,
             'key' => $apiKey,
@@ -4358,7 +4264,6 @@ function searchWithQuery($apiKey, $query, $searchType) {
         $maxResults = 3; // Limit to 3 results per strategy to avoid too many API calls
         
         foreach (array_slice($data['results'], 0, $maxResults) as $place) {
-            // Get detailed information including phone number
             $detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json?' . http_build_query([
                 'place_id' => $place['place_id'],
                 'key' => $apiKey,
@@ -4373,13 +4278,11 @@ function searchWithQuery($apiKey, $query, $searchType) {
             if ($detailsData && $detailsData['status'] === 'OK' && isset($detailsData['result'])) {
                 $details = $detailsData['result'];
                 
-                // For phone number searches, check if the phone number matches
                 $isPhoneSearch = strpos($searchType, 'phone') === 0;
                 if ($isPhoneSearch) {
                     $placePhone = preg_replace('/[^0-9]/', '', $details['formatted_phone_number'] ?? '');
                     $searchPhone = preg_replace('/[^0-9]/', '', $query);
                     
-                    // If phone numbers don't match, skip this result
                     if ($placePhone && $searchPhone && $placePhone !== $searchPhone) {
                         error_log('Phone number mismatch: searched for ' . $searchPhone . ', found ' . $placePhone);
                         continue;
@@ -4406,7 +4309,6 @@ function searchWithQuery($apiKey, $query, $searchType) {
                 error_log('Failed to get details for place: ' . $place['name']);
             }
             
-            // Add a small delay to avoid hitting rate limits
             usleep(100000); // 0.1 second delay
         }
         
@@ -4432,7 +4334,6 @@ function getClientTbrMeetings($pdo, $clientId) {
 }
 
 function generateTbrMeetingsCsv($meetings) {
-    // CSV headers
     $headers = [
         'Meeting ID',
         'Meeting Date',
@@ -4447,15 +4348,11 @@ function generateTbrMeetingsCsv($meetings) {
         'Updated At'
     ];
     
-    // Start CSV content
     $csv = '';
     
-    // Add headers
     $csv .= '"' . implode('","', $headers) . '"' . "\n";
     
-    // Add data rows
     foreach ($meetings as $meeting) {
-        // Format attendees
         $attendees = '';
         if (!empty($meeting['attendees'])) {
             $attendeeList = [];
@@ -4471,7 +4368,6 @@ function generateTbrMeetingsCsv($meetings) {
             $attendees = implode('; ', $attendeeList);
         }
         
-        // Clean and escape data for CSV
         $row = [
             $meeting['id'] ?? '',
             $meeting['meeting_date'] ?? '',
@@ -4486,7 +4382,6 @@ function generateTbrMeetingsCsv($meetings) {
             $meeting['updated_at'] ?? ''
         ];
         
-        // Add row to CSV
         $csv .= '"' . implode('","', $row) . '"' . "\n";
     }
     
@@ -4497,7 +4392,6 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
     switch ($method) {
         case 'GET':
             if ($id) {
-                // Get specific opportunity
                 $stmt = $pdo->prepare("
                     SELECT o.*, c.name as client_name, u.name as owner_name, creator.name as created_by_name
                     FROM opportunities o
@@ -4515,7 +4409,6 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
                 
                 sendResponse($opportunity);
             } else {
-                // Get opportunities (all or filtered by client)
                 $whereClause = "";
                 $params = [];
                 
@@ -4564,7 +4457,6 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
             
             $opportunityId = $pdo->lastInsertId();
             
-            // Get the created opportunity with related data
             $stmt = $pdo->prepare("
                 SELECT o.*, c.name as client_name, u.name as owner_name, creator.name as created_by_name
                 FROM opportunities o
@@ -4604,7 +4496,6 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
                 $id
             ]);
             
-            // Get the updated opportunity
             $stmt = $pdo->prepare("
                 SELECT o.*, c.name as client_name, u.name as owner_name, creator.name as created_by_name
                 FROM opportunities o
@@ -4646,7 +4537,6 @@ function handleOpportunityNotes($pdo, $method, $id, $opportunityId) {
     switch ($method) {
         case 'GET':
             if ($opportunityId) {
-                // Get notes for a specific opportunity
                 $stmt = $pdo->prepare("
                     SELECT opn.*, u.name as user_name, u.email as user_email
                     FROM opportunity_notes opn
@@ -4682,7 +4572,6 @@ function handleOpportunityNotes($pdo, $method, $id, $opportunityId) {
             $noteId = $pdo->lastInsertId();
             error_log('DEBUG: handleOpportunityNotes - POST - Created note with ID: ' . $noteId);
             
-            // Get the created note with user information
             $stmt = $pdo->prepare("
                 SELECT opn.*, u.name as user_name, u.email as user_email
                 FROM opportunity_notes opn
@@ -4716,7 +4605,6 @@ function handleOpportunityAttachments($pdo, $method, $id, $opportunityId) {
     switch ($method) {
         case 'GET':
             if ($opportunityId) {
-                // Get attachments for a specific opportunity
                 $stmt = $pdo->prepare("
                     SELECT opa.*, u.name as user_name
                     FROM opportunity_attachments opa
@@ -4746,17 +4634,14 @@ function handleOpportunityAttachments($pdo, $method, $id, $opportunityId) {
                 sendResponse(['error' => 'File upload failed'], 400);
             }
             
-            // File upload security validation
             $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx'];
             $maxFileSize = 10 * 1024 * 1024; // 10MB
             $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             
-            // Validate file type
             if (!in_array($extension, $allowedTypes)) {
                 sendResponse(['error' => 'Invalid file type. Allowed types: ' . implode(', ', $allowedTypes)], 400);
             }
             
-            // Validate file size
             if ($file['size'] > $maxFileSize) {
                 sendResponse(['error' => 'File too large. Maximum size: 10MB'], 400);
             }
@@ -4826,7 +4711,6 @@ function handleOpportunityStats($pdo, $method) {
             $isAdmin = $_SESSION['is_admin'] ?? false;
             
             if ($isAdmin) {
-                // Admin can see all opportunity stats
                 $stmt = $pdo->prepare("
                     SELECT 
                         status,
@@ -4837,7 +4721,6 @@ function handleOpportunityStats($pdo, $method) {
                 ");
                 $stmt->execute();
             } else {
-                // Non-admin users see opportunities related to their clients/activities
                 $stmt = $pdo->prepare("
                     SELECT 
                         o.status,
@@ -4855,7 +4738,6 @@ function handleOpportunityStats($pdo, $method) {
             
             $results = $stmt->fetchAll();
             
-            // Initialize all statuses with 0 count
             $stats = [
                 'new' => ['count' => 0, 'total_revenue' => 0],
                 'qualified' => ['count' => 0, 'total_revenue' => 0],
@@ -4865,7 +4747,6 @@ function handleOpportunityStats($pdo, $method) {
                 'lost' => ['count' => 0, 'total_revenue' => 0]
             ];
             
-            // Fill in actual data
             foreach ($results as $row) {
                 if (isset($stats[$row['status']])) {
                     $stats[$row['status']] = [

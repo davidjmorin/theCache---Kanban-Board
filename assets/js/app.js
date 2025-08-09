@@ -45,19 +45,16 @@ class KanbanApp {
         if (this.currentUser) {
             this.startAutoRefresh();
             
-            // Check for task parameter in URL
             const urlParams = new URLSearchParams(window.location.search);
             const taskId = urlParams.get('task');
             const clientId = urlParams.get('client');
             
-            // Store client ID if provided in URL
             if (clientId) {
                 this.pendingClientId = clientId;
                 console.log('Client ID from URL:', clientId);
             }
             
             if (taskId) {
-                // Load board data first, then open the task
                 await this.loadBoardData();
                 await this.openTaskFromUrl(taskId);
             }
@@ -73,7 +70,6 @@ class KanbanApp {
                 }
             };
 
-            // Add CSRF token to headers if available
             if (this.csrfToken && method !== 'GET') {
                 options.headers['X-CSRF-Token'] = this.csrfToken;
             }
@@ -227,7 +223,6 @@ class KanbanApp {
             this.currentUser = response.user;
             this.csrfToken = response.csrf_token;
             
-            // Redirect to dashboard after successful login
             window.location.href = '/';
         } catch (error) {
             this.showNotification('Login failed: ' + error.message, 'error');
@@ -251,7 +246,6 @@ class KanbanApp {
             this.currentUser = response.user;
             this.csrfToken = response.csrf_token;
             
-            // Show success message and redirect to main app
             this.showNotification('Registration successful! Welcome to The Cache.', 'success');
             this.showApp();
         } catch (error) {
@@ -312,7 +306,6 @@ class KanbanApp {
                 this.data.clients = [];
 
                 if (this.data.boards.length > 0) {
-                    // Try to load the last board the user was on
                     const savedBoardId = localStorage.getItem('kanban-current-board');
                     if (savedBoardId) {
                         const savedBoard = this.data.boards.find(b => b.id == parseInt(savedBoardId));
@@ -324,21 +317,18 @@ class KanbanApp {
                         }
                     }
 
-                    // If no saved board or saved board doesn't exist, use the first board
                     if (!this.data.currentBoard) {
                         this.data.currentBoard = this.data.boards[0];
                         this.saveBoardSelection(this.data.currentBoard.id);
                         console.log('Using default board:', this.data.currentBoard.name);
                     }
                 } else {
-                    // No boards exist - this shouldn't happen in normal usage
                     console.warn('No boards found');
                     this.showNotification('No boards available. Please create a board first.', 'warning');
                 }
 
                 this.populateBoardSelector();
                 
-                // If we have a current board, load its data
                 if (this.data.currentBoard) {
                     console.log('Loading data for current board:', this.data.currentBoard.name);
                     await this.loadCurrentBoardData();
@@ -381,17 +371,13 @@ class KanbanApp {
 
     async openTaskFromUrl(taskId) {
         try {
-            // Wait a moment for the board to fully render
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Find the task in the loaded data
             const task = this.data.tasks.find(t => t.id == taskId);
             if (task) {
-                // Open the task modal
                 this.showTaskModal(taskId);
                 this.showNotification(`Opened task: ${task.title}`, 'success');
             } else {
-                // Task not found in current data, try to load it directly
                 try {
                     const taskData = await this.apiCall(`tasks&id=${taskId}`);
                     if (taskData) {
@@ -429,7 +415,6 @@ class KanbanApp {
             this.populateSelectOptions();
             this.checkDueTasks();
             
-            // Update the company name to show the current board
             const companyNameElement = document.getElementById('companyName');
             if (companyNameElement && this.data.currentBoard) {
                 companyNameElement.textContent = this.data.currentBoard.name;
@@ -926,8 +911,6 @@ class KanbanApp {
             }
         }
 
-        // Don't populate stages and boards here - they will be populated dynamically
-        // Only clear them if they exist but don't have any options yet
         const stageSelect = document.getElementById('taskStage');
         if (stageSelect && stageSelect.children.length === 0) {
             stageSelect.innerHTML = '<option value="">Select Stage</option>';
@@ -970,7 +953,6 @@ class KanbanApp {
         document.getElementById('manageUsersBtn').addEventListener('click', (e) => this.showUsersModal());
         document.getElementById('userForm').addEventListener('submit', (e) => this.addUser(e));
         document.getElementById('passwordForm').addEventListener('submit', (e) => this.handlePasswordChange(e));
-        //document.getElementById('sendDueNotificationsBtn').addEventListener('click', (e) => this.sendDueNotifications());
 
         document.querySelectorAll('.user-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -1008,7 +990,6 @@ class KanbanApp {
             e.preventDefault();
             const taskId = document.getElementById('taskId').value;
             if (taskId && taskId !== 'new') {
-                // Open notes.html with the task pre-selected
                 window.open(`notes.html?task=${taskId}`, '_blank');
             } else {
                 this.showNotification('Please save the task first before creating a detailed note', 'info');
@@ -1124,13 +1105,11 @@ class KanbanApp {
             }
         });
 
-        // Add event listener for board selection to load stages
         const boardSelect = document.getElementById('taskBoard');
         if (boardSelect) {
             boardSelect.addEventListener('change', (e) => this.handleBoardChange(e));
         }
         
-        // Add event listener for user selection to load boards
         const userSelect = document.getElementById('taskAssignee');
         if (userSelect) {
             userSelect.addEventListener('change', (e) => this.handleUserChange(e));
@@ -1197,7 +1176,6 @@ class KanbanApp {
         if (modalId === 'taskModal') {
             this.clearTaskModal();
             
-            // Remove event listeners to prevent duplicates
             const boardSelect = document.getElementById('taskBoard');
             const userSelect = document.getElementById('taskAssignee');
             
@@ -1233,7 +1211,6 @@ class KanbanApp {
             callRadio.checked = true;
         }
         
-        // Clear board and stage selections
         const boardSelect = document.getElementById('taskBoard');
         if (boardSelect) {
             boardSelect.innerHTML = '<option value="">Select Board</option>';
@@ -1244,7 +1221,6 @@ class KanbanApp {
             stageSelect.innerHTML = '<option value="">Select Stage</option>';
         }
         
-        // Set client if we have a pending client ID from URL
         if (this.pendingClientId) {
             const clientSelect = document.getElementById('taskClient');
             if (clientSelect) {
@@ -1345,13 +1321,10 @@ class KanbanApp {
     }
 
     addTaskToStage(stageId) {
-        // Store the stage ID to set after modal is populated
         this.pendingStageId = stageId;
         
-        // Show the task modal
         this.showTaskModal();
         
-        // Focus on the title field for better UX
         setTimeout(() => {
             const titleInput = document.getElementById('taskTitle');
             if (titleInput) {
@@ -1368,7 +1341,6 @@ class KanbanApp {
             document.getElementById('taskModalTitle').textContent = 'Add Task';
             this.clearTaskModal();
             
-            // Set client if we have a pending client ID from URL
             if (this.pendingClientId) {
                 const clientSelect = document.getElementById('taskClient');
                 if (clientSelect) {
@@ -1391,7 +1363,6 @@ class KanbanApp {
 
         this.showModal('taskModal');
         
-        // For new tasks, ensure the color field is set to default
         if (!taskId) {
             const colorInput = document.getElementById('taskCardColor');
             if (colorInput) {
@@ -1531,10 +1502,8 @@ class KanbanApp {
                 displayContent.innerHTML = this.renderMarkdown(task.description || '');
             }
 
-            // First populate the dropdowns with all options
             this.populateSelectOptions();
 
-            // Then set the specific values for this task
             document.getElementById('taskStage').value = task.stage_id;
             document.getElementById('taskBoard').value = task.board_id || '';
             document.getElementById('taskAssignee').value = task.user_id || '';
@@ -1545,7 +1514,6 @@ class KanbanApp {
             document.getElementById('taskCardColor').value = task.card_color || '#1a202c';
             document.getElementById('taskPriority').value = task.priority || 'medium';
 
-            // If the task has a board_id, populate the stages for that board
             if (task.board_id) {
                 try {
                     const stages = await this.apiCall(`stages&board_id=${task.board_id}`);
@@ -1558,7 +1526,6 @@ class KanbanApp {
                             option.textContent = stage.name;
                             stageSelect.appendChild(option);
                         });
-                        // Set the stage value again after populating
                         stageSelect.value = task.stage_id;
                     }
                 } catch (error) {
@@ -1645,13 +1612,11 @@ class KanbanApp {
 
         let description = formData.get('taskDescription');
 
-        // If editing a task, preserve original values if fields are empty
         let boardId = formData.get('taskBoard');
         let userId = formData.get('taskAssignee');
         let stageId = formData.get('taskStage');
 
         if (taskId) {
-            // When editing, if fields are empty, preserve the original values
             if (!boardId) {
                 const boardSelect = document.getElementById('taskBoard');
                 boardId = boardSelect ? boardSelect.value : null;
@@ -1720,10 +1685,8 @@ class KanbanApp {
             this.renderBoard();
             this.hideModal('taskModal');
             
-            // Clear pending client ID after task creation
             if (this.pendingClientId) {
                 this.pendingClientId = null;
-                // Remove client parameter from URL
                 const url = new URL(window.location);
                 url.searchParams.delete('client');
                 window.history.replaceState({}, '', url);
@@ -2131,16 +2094,13 @@ class KanbanApp {
     }
 
     showAddClientModal(clientId = null) {
-        // Clear the form
         document.getElementById('clientForm').reset();
         document.getElementById('clientId').value = '';
         
-        // Set modal title and button text
         const modalTitle = document.getElementById('addClientModalTitle');
         const submitBtn = document.querySelector('#clientForm button[type="submit"]');
         
         if (clientId) {
-            // Editing existing client
             const client = this.data.clients.find(c => c.id == clientId);
             if (client) {
                 document.getElementById('clientId').value = client.id;
@@ -2154,7 +2114,6 @@ class KanbanApp {
                 submitBtn.textContent = 'Update Client';
             }
         } else {
-            // Adding new client
             modalTitle.textContent = 'Add New Client';
             submitBtn.textContent = 'Add Client';
         }
@@ -2188,7 +2147,6 @@ class KanbanApp {
             const activeTasks = clientTasks.filter(task => !task.is_completed).length;
             const completedTasks = clientTasks.filter(task => task.is_completed).length;
             
-            // Clean up the data for display
             const displayName = client.name || 'Unnamed Client';
             const displayContactName = client.contact_name && client.contact_name !== 'NONE' && client.contact_name !== 'NA' ? client.contact_name : '';
             const displayContactNumber = client.contact_number && client.contact_number !== 'NONE' && client.contact_number !== 'NA' ? client.contact_number : '';
@@ -2320,10 +2278,8 @@ class KanbanApp {
             this.loadClients();
             this.populateSelectOptions();
 
-            // Close the modal
             this.hideModal('addClientModal');
             
-            // Reset form
             document.getElementById('clientForm').reset();
             document.getElementById('clientId').value = '';
 
@@ -2552,7 +2508,6 @@ class KanbanApp {
             const notes = await this.apiCall(`obsidian-notes&id=${taskId}`, 'GET');
             this.displayNotes(notes);
             
-            // Load linked detailed notes
             const linkedNotes = await this.apiCall(`notes`, 'GET', null, { task_id: taskId });
             this.displayLinkedNotes(linkedNotes);
         } catch (error) {
@@ -3514,7 +3469,6 @@ class KanbanApp {
         this.saveBoardSelection(board.id);
         this.populateBoardSelector();
 
-        // Update the company name to show the current board
         const companyNameElement = document.getElementById('companyName');
         if (companyNameElement) {
             companyNameElement.textContent = board.name;
@@ -3957,7 +3911,6 @@ class KanbanApp {
         const boardId = event.target.value;
         const stageSelect = document.getElementById('taskStage');
         
-        // Clear stages first
         stageSelect.innerHTML = '<option value="">Select Stage</option>';
         
         if (!boardId) {
@@ -3969,7 +3922,6 @@ class KanbanApp {
             
             if (stages && stages.length > 0) {
                 stages.forEach(stage => {
-                    // Check if option already exists
                     const existingOption = stageSelect.querySelector(`option[value="${stage.id}"]`);
                     if (!existingOption) {
                         const option = document.createElement('option');
@@ -3979,7 +3931,6 @@ class KanbanApp {
                     }
                 });
             } else {
-                // If no stages for this board, show a message
                 const option = document.createElement('option');
                 option.value = '';
                 option.textContent = 'No stages available for this board';
@@ -3997,7 +3948,6 @@ class KanbanApp {
         const boardSelect = document.getElementById('taskBoard');
         const stageSelect = document.getElementById('taskStage');
         
-        // Clear board and stage selections
         boardSelect.innerHTML = '<option value="">Select Board</option>';
         stageSelect.innerHTML = '<option value="">Select Stage</option>';
         
@@ -4006,12 +3956,10 @@ class KanbanApp {
         }
         
         try {
-            // Load boards for the selected user
             const boards = await this.apiCall(`boards&user_id=${userId}`);
             
             if (boards && boards.length > 0) {
                 boards.forEach(board => {
-                    // Check if option already exists
                     const existingOption = boardSelect.querySelector(`option[value="${board.id}"]`);
                     if (!existingOption) {
                         const option = document.createElement('option');
@@ -4021,7 +3969,6 @@ class KanbanApp {
                     }
                 });
             } else {
-                // If no boards for this user, show a message
                 const option = document.createElement('option');
                 option.value = '';
                 option.textContent = 'No boards available for this user';

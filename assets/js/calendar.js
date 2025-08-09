@@ -90,7 +90,6 @@ class CalendarApp {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Calculate how many weeks we need to display
         const endDate = new Date(lastDay);
         endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
         const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
@@ -110,13 +109,11 @@ class CalendarApp {
                 dayDiv.classList.add('other-month');
             }
             
-            // Create day number element
             const dayNumber = document.createElement('div');
             dayNumber.className = 'calendar-day-number';
             dayNumber.textContent = currentDate.getDate();
             dayDiv.appendChild(dayNumber);
             
-            // Create tasks container (always create it, even if empty)
             const tasksContainer = document.createElement('div');
             tasksContainer.className = 'calendar-tasks';
             

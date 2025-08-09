@@ -14,7 +14,6 @@
 require_once 'api/config.php';
 require_once 'api/email_notifications.php';
 
-// Parse command line arguments
 $options = getopt('', ['type:']);
 $notificationType = $options['type'] ?? '';
 
@@ -23,7 +22,6 @@ if (!in_array($notificationType, ['week', 'day'])) {
     exit(1);
 }
 
-// Initialize database connection
 try {
     $pdo = getConnection();
     $emailNotifications = new EmailNotifications($pdo);
@@ -32,23 +30,19 @@ try {
     exit(1);
 }
 
-// Calculate the target date range based on notification type
 $startDate = '';
 $endDate = '';
 
 if ($notificationType === 'week') {
-    // For week notifications: check all TBRs scheduled within the next 7 days
     $startDate = date('Y-m-d', strtotime('+1 day')); // Start from tomorrow
     $endDate = date('Y-m-d', strtotime('+7 days')); // End 7 days from now
 } else {
-    // For day notifications: check all TBRs scheduled for tomorrow
     $startDate = date('Y-m-d', strtotime('+1 day'));
     $endDate = date('Y-m-d', strtotime('+1 day'));
 }
 
 echo "Processing TBR meetings from $startDate to $endDate ($notificationType notification)\n";
 
-// Get TBR meetings scheduled within the date range
 $stmt = $pdo->prepare("
     SELECT 
         m.*,
@@ -85,7 +79,6 @@ $skippedCount = 0;
 
 foreach ($meetings as $meeting) {
     try {
-        // Get attendees for this meeting
         $stmt = $pdo->prepare("
             SELECT a.*, u.name as user_name, u.email as user_email
             FROM tbr_attendees a
@@ -95,10 +88,8 @@ foreach ($meetings as $meeting) {
         $stmt->execute([$meeting['id']]);
         $attendees = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Prepare email recipients
         $recipients = [];
         
-        // Add account manager if available
         if (!empty($meeting['account_manager_email'])) {
             $recipients[] = [
                 'email' => $meeting['account_manager_email'],
@@ -106,7 +97,6 @@ foreach ($meetings as $meeting) {
             ];
         }
         
-        // Add client contact if available
         if (!empty($meeting['client_email'])) {
             $recipients[] = [
                 'email' => $meeting['client_email'],
@@ -114,7 +104,6 @@ foreach ($meetings as $meeting) {
             ];
         }
         
-        // Add meeting creator if available
         if (!empty($meeting['created_by_email'])) {
             $recipients[] = [
                 'email' => $meeting['created_by_email'],
@@ -122,7 +111,6 @@ foreach ($meetings as $meeting) {
             ];
         }
         
-        // Add attendees
         foreach ($attendees as $attendee) {
             if (!empty($attendee['email'])) {
                 $recipients[] = [
@@ -132,7 +120,6 @@ foreach ($meetings as $meeting) {
             }
         }
         
-        // Remove duplicates based on email
         $uniqueRecipients = [];
         $seenEmails = [];
         foreach ($recipients as $recipient) {
@@ -148,7 +135,6 @@ foreach ($meetings as $meeting) {
             continue;
         }
         
-        // Send email to each recipient
         foreach ($uniqueRecipients as $recipient) {
             $emailSent = sendTbrMeetingNotification(
                 $emailNotifications,
@@ -185,18 +171,15 @@ echo "Total meetings processed: " . count($meetings) . "\n";
  * Send TBR meeting notification email
  */
 function sendTbrMeetingNotification($emailNotifications, $recipientEmail, $recipientName, $meeting, $attendees, $notificationType) {
-    // Calculate days until meeting
     $meetingDate = new DateTime($meeting['meeting_date']);
     $today = new DateTime();
     $daysUntilMeeting = $today->diff($meetingDate)->days;
     
     $subject = "TBR Meeting Reminder: {$meeting['client_name']} - {$meeting['meeting_type']}";
     
-    // Format meeting date
     $meetingDateFormatted = date('l, F j, Y', strtotime($meeting['meeting_date']));
     $meetingTime = 'TBD'; // You might want to add a time field to the database
     
-    // Format attendees
     $attendeeList = '';
     if (!empty($attendees)) {
         $attendeeNames = [];
@@ -274,10 +257,7 @@ function sendTbrMeetingNotification($emailNotifications, $recipientEmail, $recip
     return $emailNotifications->sendEmailViaBrevoPublic($recipientEmail, $subject, $message);
 }
 
-// Add the sendEmailViaBrevo method to EmailNotifications class if it doesn't exist
 if (!method_exists($emailNotifications, 'sendEmailViaBrevo')) {
-    // This method should already exist in the EmailNotifications class
-    // If it doesn't, we'll need to add it
     echo "Warning: sendEmailViaBrevo method not found in EmailNotifications class\n";
 }
 ?>

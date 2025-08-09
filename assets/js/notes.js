@@ -11,7 +11,6 @@ class NotesApp {
     }
 
     async init() {
-        // Check authentication
         const authResult = await this.checkAuth();
         if (!authResult.authenticated) {
             window.location.href = '/kanban.html';
@@ -20,7 +19,6 @@ class NotesApp {
 
         this.csrfToken = authResult.csrf_token;
         
-        // Initialize CodeMirror editor
         this.editor = CodeMirror.fromTextArea(document.getElementById('noteEditor'), {
             mode: 'markdown',
             theme: 'monokai',
@@ -30,28 +28,23 @@ class NotesApp {
             placeholder: 'Start writing your note...\n\nUse Markdown syntax for formatting:\n# Headers\n**Bold**\n*Italic*\n- Lists\n[Links](url)'
         });
 
-        // Load initial data
         await this.loadClients();
         await this.loadTasks();
         await this.loadNotes();
         
-        // Check for URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const taskId = urlParams.get('task');
         const noteId = urlParams.get('note');
         
-        // Handle task parameter - pre-select the task
         if (taskId) {
             document.getElementById('linkTask').value = taskId;
             console.log('Task pre-selected from URL:', taskId);
         }
         
-        // Handle note parameter - load the specific note
         if (noteId) {
             await this.selectNote(noteId);
         }
         
-        // Set up event listeners
         this.setupEventListeners();
     }
 
@@ -88,7 +81,6 @@ class NotesApp {
         try {
             const response = await fetch(`${this.apiBase}${endpoint}`, options);
             
-            // Check if response is empty or not JSON
             const text = await response.text();
             let result;
             
@@ -222,7 +214,6 @@ class NotesApp {
             return;
         }
         
-        // Sort notes by updated_at
         const sortedNotes = this.notes.sort((a, b) => {
             return new Date(b.updated_at) - new Date(a.updated_at);
         });
@@ -263,7 +254,6 @@ class NotesApp {
         document.getElementById('linkClient').value = note.client_id || '';
         document.getElementById('linkTask').value = note.task_id || '';
         
-        // Ensure we're in editor mode when loading a note
         const editorContainer = document.getElementById('editorContainer');
         const previewContainer = document.getElementById('previewContainer');
         const previewToggle = document.getElementById('previewToggle');
@@ -310,7 +300,6 @@ class NotesApp {
         document.getElementById('linkTask').value = '';
         document.getElementById('noteLinks').style.display = 'none';
         
-        // Ensure we're in editor mode when clearing
         const editorContainer = document.getElementById('editorContainer');
         const previewContainer = document.getElementById('previewContainer');
         const previewToggle = document.getElementById('previewToggle');
@@ -342,10 +331,8 @@ class NotesApp {
             };
             
             if (this.currentNote) {
-                // Update existing note
                 await this.apiCall(`notes&id=${this.currentNote.id}`, 'PUT', noteData);
             } else {
-                // Create new note
                 const result = await this.apiCall('notes', 'POST', noteData);
                 this.currentNote = { id: result.id };
             }
@@ -387,19 +374,16 @@ class NotesApp {
         const previewIcon = previewToggle.querySelector('i');
         
         if (editorContainer.style.display === 'none') {
-            // Switch to editor mode
             editorContainer.style.display = 'block';
             previewContainer.style.display = 'none';
             previewIcon.className = 'fas fa-eye';
             previewToggle.innerHTML = '<i class="fas fa-eye"></i> Preview';
         } else {
-            // Switch to preview mode
             editorContainer.style.display = 'none';
             previewContainer.style.display = 'block';
             previewIcon.className = 'fas fa-edit';
             previewToggle.innerHTML = '<i class="fas fa-edit"></i> Edit';
             
-            // Render markdown preview
             this.renderMarkdownPreview();
         }
     }
@@ -414,7 +398,6 @@ class NotesApp {
         }
         
         try {
-            // Configure marked.js options
             marked.setOptions({
                 breaks: true,
                 gfm: true
@@ -483,7 +466,6 @@ class NotesApp {
     }
 
     setupEventListeners() {
-        // Auto-save on content change (debounced)
         let saveTimeout;
         this.editor.on('change', () => {
             clearTimeout(saveTimeout);
@@ -494,7 +476,6 @@ class NotesApp {
             }, 2000);
         });
         
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
                 switch (e.key) {
@@ -554,12 +535,10 @@ class NotesApp {
         
         document.body.appendChild(notification);
         
-        // Animate in
         setTimeout(() => {
             notification.style.transform = 'translateX(0)';
         }, 10);
         
-        // Remove after 3 seconds
         setTimeout(() => {
             notification.style.transform = 'translateX(100%)';
             setTimeout(() => {
@@ -571,5 +550,4 @@ class NotesApp {
     }
 }
 
-// Initialize the app when the page loads
 const notesApp = new NotesApp(); 

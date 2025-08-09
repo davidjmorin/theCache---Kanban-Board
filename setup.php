@@ -8,10 +8,8 @@
  * Configuration is loaded from .env file - make sure to create one with your database credentials.
  */
 
-// Load environment variables
 require_once __DIR__ . '/api/env_loader.php';
 
-// Configuration from environment variables (same as your main app)
 $db_host = getenv('DB_HOST') ?: 'localhost';
 $db_name = getenv('DB_NAME') ?: 'kanban_board2';
 $db_user = getenv('DB_USER') ?: '';
@@ -19,7 +17,6 @@ $db_pass = getenv('DB_PASS') ?: '';
 $google_api_key = getenv('GOOGLE_API_KEY') ?: '';
 $brevo_api_key = getenv('BREVO_API_KEY') ?: '';
 
-// Set error reporting
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -104,7 +101,6 @@ ini_set('display_errors', 1);
         <h1>🚀 Kanban Board Setup</h1>
         
         <?php
-        // Check if this is a POST request to run setup
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($_POST['action'])) {
                 if ($_POST['action'] === 'setup') {
@@ -203,7 +199,6 @@ BREVO_API_KEY = <?php echo $brevo_api_key ? '***' : '<span style="color: #f39c12
             
             echo '<div class="step"><h3>🔍 Configuration Check</h3>';
             
-            // Check if .env file exists
             if (!file_exists('.env')) {
                 echo '<div class="step error">❌ .env file not found. Please create a .env file with your database credentials.</div>';
                 echo '<form method="GET"><button type="submit">← Back to Setup</button></form>';
@@ -212,19 +207,16 @@ BREVO_API_KEY = <?php echo $brevo_api_key ? '***' : '<span style="color: #f39c12
             
             echo '<div class="step success">✅ .env file found</div>';
             
-            // Check if credentials are set
             if (empty($db_user) || empty($db_pass)) {
                 echo '<div class="step error">❌ Please set DB_USER and DB_PASS in your .env file before proceeding.</div>';
                 echo '<form method="GET"><button type="submit">← Back to Setup</button></form>';
                 return;
             }
             
-            // Test database connection
             try {
                 $pdo = new PDO("mysql:host=$db_host", $db_user, $db_pass);
                 echo '<div class="step success">✅ Database connection successful</div>';
                 
-                // Check if database exists
                 $stmt = $pdo->query("SHOW DATABASES LIKE '$db_name'");
                 if ($stmt->rowCount() > 0) {
                     echo '<div class="step success">✅ Database "' . $db_name . '" exists</div>';
@@ -252,14 +244,12 @@ BREVO_API_KEY = <?php echo $brevo_api_key ? '***' : '<span style="color: #f39c12
             
             echo '<div class="step"><h3>🚀 Running Database Setup</h3>';
             
-            // Check .env file first
             if (!file_exists('.env')) {
                 echo '<div class="step error">❌ .env file not found. Please create one first!</div>';
                 echo '<form method="GET"><button type="submit">← Back to Setup</button></form>';
                 return;
             }
             
-            // Check credentials
             if (empty($db_user) || empty($db_pass)) {
                 echo '<div class="step error">❌ Please set DB_USER and DB_PASS in your .env file first!</div>';
                 echo '<form method="GET"><button type="submit">← Back to Setup</button></form>';
@@ -267,13 +257,11 @@ BREVO_API_KEY = <?php echo $brevo_api_key ? '***' : '<span style="color: #f39c12
             }
 
             try {
-                // Connect to database
                 $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
                 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 
                 echo '<div class="step success">✅ Connected to database</div>';
                 
-                // Execute the setup SQL
                 $sql = getDatabaseSetupSQL();
                 $statements = explode(';', $sql);
                 
@@ -290,7 +278,6 @@ BREVO_API_KEY = <?php echo $brevo_api_key ? '***' : '<span style="color: #f39c12
                             $created_tables++;
                         }
                     } catch (PDOException $e) {
-                        // Ignore "table already exists" errors
                         if (strpos($e->getMessage(), 'already exists') === false) {
                             echo '<div class="step error">❌ Error executing SQL: ' . $e->getMessage() . '</div>';
                             $errors++;

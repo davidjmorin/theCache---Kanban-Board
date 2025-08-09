@@ -1,15 +1,12 @@
 <?php
-// Set timezone to Eastern
 date_default_timezone_set('America/New_York');
 
-// Enhanced session security
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', 0); // Set to 1 in production with HTTPS
 ini_set('session.use_strict_mode', 1);
 ini_set('session.cookie_samesite', 'Lax'); // Changed from 'Strict' to 'Lax' for API compatibility
 ini_set('session.gc_maxlifetime', 3600); // 1 hour session timeout
 
-// Security headers
 header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -17,7 +14,6 @@ header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: https:; font-src \'self\' https:; connect-src \'self\';');
 
-// CORS Configuration - Restrict to specific domains in production
 $allowedOrigins = [
     'http://localhost:8000',
     'http://localhost:3000',
@@ -25,7 +21,6 @@ $allowedOrigins = [
     'http://127.0.0.1:3000',
     'https://board.thecache.io',
     'http://board.thecache.io'
-    // Add your production domain here: 'https://yourdomain.com'
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -43,10 +38,8 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS
     exit(0);
 }
 
-// Load environment variables
 require_once __DIR__ . '/env_loader.php';
 
-// Database configuration from environment variables
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'kanban_board2');
 define('DB_USER', getenv('DB_USER') ?: 'diamonddave');
@@ -149,10 +142,8 @@ function createTables($pdo) {
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
     )");
 
-    // Run migrations for existing tables
     runMigrations($pdo);
     
-    // Run CRM migrations
     runCrmMigrations($pdo);
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS attachments (
@@ -211,7 +202,6 @@ function insertDefaultData($pdo) {
     }
 
     $defaultUsers = [
-        // Removed default admin account for security
         ['John Doe', 'john@example.com', password_hash('user123', PASSWORD_DEFAULT), false],
         ['Jane Smith', 'jane@example.com', password_hash('user123', PASSWORD_DEFAULT), false]
     ];
@@ -252,7 +242,6 @@ function insertDefaultData($pdo) {
             $pdo->exec("ALTER TABLE tasks ADD COLUMN card_color VARCHAR(7) DEFAULT '#1a202c'");
         }
     } catch (Exception $e) {
-        // Ignore errors if columns already exist
     }
 }
 
@@ -307,16 +296,13 @@ function runCrmMigrations($pdo) {
         $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP NULL");
         $pdo->exec("ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes TEXT NULL");
         
-        // Add foreign key constraints
         $pdo->exec("ALTER TABLE clients ADD CONSTRAINT IF NOT EXISTS fk_clients_account_manager 
             FOREIGN KEY (account_manager_id) REFERENCES users(id) ON DELETE SET NULL");
         $pdo->exec("ALTER TABLE clients ADD CONSTRAINT IF NOT EXISTS fk_clients_created_by 
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL");
     } catch (Exception $e) {
-        // Columns might already exist, ignore error
     }
     
-    // Create client contacts table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_contacts (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -331,7 +317,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
     )");
 
-    // Create client activities table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_activities (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -345,7 +330,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create client attachments table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_attachments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -361,7 +345,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create client todos table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_todos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -379,7 +362,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create client groups table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_groups (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -388,7 +370,6 @@ function runCrmMigrations($pdo) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )");
 
-    // Create opportunities table
     $pdo->exec("CREATE TABLE IF NOT EXISTS opportunities (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -407,7 +388,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create opportunity notes table
     $pdo->exec("CREATE TABLE IF NOT EXISTS opportunity_notes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         opportunity_id INT NOT NULL,
@@ -418,7 +398,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create opportunity attachments table
     $pdo->exec("CREATE TABLE IF NOT EXISTS opportunity_attachments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         opportunity_id INT NOT NULL,
@@ -434,7 +413,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create client group members table
     $pdo->exec("CREATE TABLE IF NOT EXISTS client_group_members (
         id INT AUTO_INCREMENT PRIMARY KEY,
         group_id INT NOT NULL,
@@ -447,7 +425,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE CASCADE
     )");
 
-    // Create notes table for Obsidian-like notes
     $pdo->exec("CREATE TABLE IF NOT EXISTS notes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
@@ -468,7 +445,6 @@ function runCrmMigrations($pdo) {
         FULLTEXT idx_notes_content (title, content)
     )");
 
-    // Create note links table for bidirectional linking
     $pdo->exec("CREATE TABLE IF NOT EXISTS note_links (
         id INT AUTO_INCREMENT PRIMARY KEY,
         source_note_id INT NOT NULL,
@@ -480,7 +456,6 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (target_note_id) REFERENCES notes(id) ON DELETE CASCADE
     )");
 
-    // Add indexes for better performance
     try {
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_company_type ON clients(company_type)");
@@ -491,15 +466,12 @@ function runCrmMigrations($pdo) {
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_todos_user ON client_todos(user_id)");
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_client_contacts_client ON client_contacts(client_id)");
     } catch (Exception $e) {
-        // Indexes might already exist, ignore error
     }
     
-    // Create TBR tables
     createTbrTables($pdo);
 }
 
 function createTbrTables($pdo) {
-    // TBR Meetings table
     $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_meetings (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT NOT NULL,
@@ -518,7 +490,6 @@ function createTbrTables($pdo) {
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
     )");
     
-    // TBR Attendees table
     $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_attendees (
         id INT AUTO_INCREMENT PRIMARY KEY,
         meeting_id INT NOT NULL,
@@ -530,7 +501,6 @@ function createTbrTables($pdo) {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     )");
     
-    // TBR Attachments table  
     $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_attachments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         meeting_id INT NOT NULL,
@@ -549,7 +519,6 @@ function createTbrTables($pdo) {
 function sendResponse($data, $status = 200) {
     http_response_code($status);
     
-    // Sanitize error messages in production
     if (isset($data['error']) && !isDevelopment()) {
         $data['error'] = 'An error occurred. Please try again.';
     }
@@ -661,7 +630,6 @@ function checkRateLimit($pdo, $userId, $action, $limit = 5, $window = 300) {
         return false; // Rate limit exceeded
     }
     
-    // Log this attempt
     $stmt = $pdo->prepare("INSERT INTO rate_limits (user_id, action) VALUES (?, ?)");
     $stmt->execute([$userId, $action]);
     
