@@ -12,6 +12,38 @@ class CRMApp {
         await this.loadClients();
         await this.loadUsers();
         this.setupEventListeners();
+        
+        // Handle URL parameters for client and tab
+        const urlParams = new URLSearchParams(window.location.search);
+        const clientId = urlParams.get('client');
+        const tabName = urlParams.get('tab');
+        
+        if (clientId) {
+            // Find the client and select it
+            const client = this.clients.find(c => c.id == clientId);
+            if (client) {
+                await this.selectClient(clientId);
+                if (tabName) {
+                    // Switch to the specified tab
+                    setTimeout(() => {
+                        this.switchTab(tabName);
+                    }, 100);
+                }
+            } else {
+                // If client not found in loaded clients, try to load it directly
+                try {
+                    await this.selectClient(clientId);
+                    if (tabName) {
+                        setTimeout(() => {
+                            this.switchTab(tabName);
+                        }, 100);
+                    }
+                } catch (error) {
+                    console.error('Failed to load client:', error);
+                    this.showNotification('Client not found', 'error');
+                }
+            }
+        }
     }
 
     async checkAuthentication() {
@@ -20,13 +52,13 @@ class CRMApp {
             if (response.authenticated) {
                 this.currentUser = response.user;
             } else {
-                window.location.href = 'index.html';
+                window.location.href = '/kanban.html';
             }
         } catch (error) {
             console.error('Auth check failed:', error);
 
             if (error.message.includes('Authentication required') || error.message.includes('401')) {
-            window.location.href = 'index.html';
+            window.location.href = '/kanban.html';
             } else {
                 this.showNotification('Authentication error: ' + error.message, 'error');
             }
@@ -39,7 +71,8 @@ class CRMApp {
                 method,
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                credentials: 'include' // Include cookies for session management
             };
 
             if (data && method !== 'GET') {
@@ -55,7 +88,41 @@ class CRMApp {
                     const errorResult = await response.json();
                     errorMessage = errorResult.error || errorMessage;
                 } catch (jsonError) {
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
 
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('API Error:', error);
+            this.showNotification('Error: ' + error.message, 'error');
+            throw error;
+        }
+    }
+
+    async apiCallFormData(endpoint, method = 'POST', formData = null) {
+        try {
+            const options = {
+                method,
+                credentials: 'include' // Include cookies for session management
+            };
+
+            if (formData && method !== 'GET') {
+                options.body = formData;
+                // Don't set Content-Type header - let the browser set it with the boundary
+            }
+
+            const url = this.apiBase + endpoint;
+            const response = await fetch(url, options);
+
+            if (!response.ok) {
+                let errorMessage = 'API request failed';
+                try {
+                    const errorResult = await response.json();
+                    errorMessage = errorResult.error || errorMessage;
+                } catch (jsonError) {
                     errorMessage = response.statusText || errorMessage;
                 }
                 throw new Error(errorMessage);
@@ -156,6 +223,7 @@ class CRMApp {
             console.log('Client data received:', client);
             if (client && client.id) {
                 this.currentClient = client; // Set the current client
+                console.log('Setting current client and showing detail');
                 this.showClientDetail(client);
             } else {
                 console.error('Invalid client data:', client);
@@ -168,6 +236,7 @@ class CRMApp {
     }
 
     showClientDetail(client) {
+        console.log('showClientDetail called with client:', client);
         document.getElementById('clientList').style.display = 'none';
         document.getElementById('clientDetail').classList.add('active');
         
@@ -243,7 +312,10 @@ class CRMApp {
                 <button class="client-tab" onclick="crmApp.switchTab('contacts', event)">Contacts (${client.contacts?.length || 0})</button>
                 <button class="client-tab" onclick="crmApp.switchTab('tasks', event)">Open Tasks (${client.tasks?.length || 0})</button>
                 <button class="client-tab" onclick="crmApp.switchTab('todos', event)">To-Dos (${client.todos?.length || 0})</button>
+                <button class="client-tab" onclick="crmApp.switchTab('opportunities', event)">Opportunities (${client.opportunities?.length || 0})</button>
+                <button class="client-tab" onclick="crmApp.switchTab('tbr', event)">TBR Meetings (${client.tbrMeetings?.length || 0})</button>
                 <button class="client-tab" onclick="crmApp.switchTab('attachments', event)">Attachments (${client.attachments?.length || 0})</button>
+                <button class="client-tab" onclick="crmApp.switchTab('assets', event)">Assets (${client.assets?.length || 0})</button>
             </div>
 
             <div id="activityTab" class="tab-content active">
@@ -262,12 +334,26 @@ class CRMApp {
                 ${this.renderTodosTab(client)}
             </div>
 
+            <div id="opportunitiesTab" class="tab-content">
+                ${this.renderOpportunitiesTab(client)}
+            </div>
+
+            <div id="tbrTab" class="tab-content">
+                ${this.renderTbrTab(client)}
+            </div>
+
             <div id="attachmentsTab" class="tab-content">
                 ${this.renderAttachmentsTab(client)}
             </div>
+
+            <div id="assetsTab" class="tab-content">
+                ${this.renderAssetsTab(client)}
+            </div>
         `;
         
+        console.log('Setting clientDetail innerHTML');
         document.getElementById('clientDetail').innerHTML = detailContent;
+        console.log('Client detail set successfully');
     }
 
     formatAddress(client) {
@@ -309,24 +395,31 @@ class CRMApp {
                 ${client.activities && client.activities.length > 0 ? 
                     client.activities.map(activity => `
                         <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                                <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                                    <div class="activity-avatar">${activity.user_name ? activity.user_name.charAt(0).toUpperCase() : 'U'}</div>
-                            <div class="activity-content">
-                                <div class="activity-header">
-                                            <h4 style="margin: 0; color: var(--text-primary);">${activity.title}</h4>
-                                            <p style="margin: 0.25rem 0 0 0; color: var(--text-secondary);">${activity.description || ''}</p>
+                            <div style="display: flex; flex-direction: column; height: 100%;">
+                                <!-- Title in top left -->
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                                    <h4 style="margin: 0; color: var(--text-primary); font-weight: 600;">${activity.title}</h4>
                                 </div>
+                                
+                                <!-- Description below title -->
+                                <div style="flex: 1; margin-bottom: 1rem;">
+                                    <p style="margin: 0; color: var(--text-secondary); line-height: 1.4;">${activity.description || ''}</p>
+                                </div>
+                                
+                                <!-- Date, creator, and action buttons in bottom right -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                                        <span>${this.formatDate(activity.activity_date)}</span>
+                                        ${activity.user_name ? `<span>• Created by ${activity.user_name}</span>` : ''}
                                     </div>
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span style="font-size: 0.875rem; color: var(--text-secondary);">${this.formatDate(activity.activity_date)}</span>
-                                    <button class="btn btn-sm btn-secondary" onclick="crmApp.editActivity(${client.id}, ${activity.id})" title="Edit Activity">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="crmApp.deleteActivity(${client.id}, ${activity.id})" title="Delete Activity">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </button>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <button class="btn btn-sm btn-secondary" onclick="crmApp.editActivity(${client.id}, ${activity.id})" title="Edit Activity">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="crmApp.deleteActivity(${client.id}, ${activity.id})" title="Delete Activity">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -387,21 +480,21 @@ class CRMApp {
                                 </th>
                                 <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); font-weight: 600;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <i class="fas fa-sort"></i> Email
+                                    </div>
+                                    <input type="text" id="contactEmailSearch" placeholder="Search email..." style="width: 100%; margin-top: 0.5rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.875rem;" onkeyup="crmApp.filterContacts()">
+                                </th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); font-weight: 600;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <i class="fas fa-sort"></i> Phone
                                     </div>
                                     <input type="text" id="contactPhoneSearch" placeholder="Search phone..." style="width: 100%; margin-top: 0.5rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.875rem;" onkeyup="crmApp.filterContacts()">
                                 </th>
                                 <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); font-weight: 600;">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <i class="fas fa-sort"></i> Mobile Phone
+                                        <i class="fas fa-sort"></i> Position
                                     </div>
-                                    <input type="text" id="contactMobileSearch" placeholder="Search mobile..." style="width: 100%; margin-top: 0.5rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.875rem;" onkeyup="crmApp.filterContacts()">
-                                </th>
-                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); font-weight: 600;">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <i class="fas fa-sort"></i> Last Activity
-                                    </div>
-                                    <input type="text" id="contactActivitySearch" placeholder="Search activity..." style="width: 100%; margin-top: 0.5rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.875rem;" onkeyup="crmApp.filterContacts()">
+                                    <input type="text" id="contactPositionSearch" placeholder="Search position..." style="width: 100%; margin-top: 0.5rem; padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.875rem;" onkeyup="crmApp.filterContacts()">
                                 </th>
                             </tr>
                         </thead>
@@ -430,9 +523,9 @@ class CRMApp {
                                                 <span style="color: var(--primary-color); font-weight: 500; cursor: pointer;" onclick="crmApp.viewContact(${client.id}, ${contact.id})">${contact.name}</span>
                             </div>
                                         </td>
+                                        <td style="padding: 0.75rem;">${contact.email || '-'}</td>
                                         <td style="padding: 0.75rem;">${contact.phone || '-'}</td>
-                                        <td style="padding: 0.75rem;">${contact.mobile_phone || '-'}</td>
-                                        <td style="padding: 0.75rem;">${contact.last_activity ? this.formatDate(contact.last_activity) : '-'}</td>
+                                        <td style="padding: 0.75rem;">${contact.position || '-'}</td>
                                     </tr>
                     `).join('') : 
                                 `<tr><td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No contacts found</td></tr>`
@@ -449,9 +542,7 @@ class CRMApp {
                                     <div class="contact-info">
                                         ${contact.email ? `<div><i class="fas fa-envelope"></i> ${contact.email}</div>` : ''}
                                         ${contact.phone ? `<div><i class="fas fa-phone"></i> ${contact.phone}</div>` : ''}
-                                        ${contact.mobile_phone ? `<div><i class="fas fa-mobile-alt"></i> ${contact.mobile_phone}</div>` : ''}
                                         ${contact.position ? `<div><i class="fas fa-briefcase"></i> ${contact.position}</div>` : ''}
-                                        ${contact.last_activity ? `<div><i class="fas fa-clock"></i> ${this.formatDate(contact.last_activity)}</div>` : ''}
                                     </div>
                                     <div class="contact-actions">
                                         <button class="btn btn-sm btn-secondary" onclick="crmApp.viewContact(${client.id}, ${contact.id})">
@@ -469,10 +560,6 @@ class CRMApp {
                             `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary); padding: 2rem;">No contacts found</div>`
                         }
                     </div>
-                </div>
-
-                <div style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
-                    1 - ${client.contacts ? client.contacts.length : 0} of ${client.contacts ? client.contacts.length : 0}
                 </div>
             </div>
         `;
@@ -496,7 +583,7 @@ class CRMApp {
             </div>
             <div>
                 ${client.tasks.map(task => `
-                    <div class="card" style="margin-bottom: 1rem; padding: 1rem; cursor: pointer;" onclick="window.location.href='index.html?task=${task.id}'">
+                    <div class="card" style="margin-bottom: 1rem; padding: 1rem; cursor: pointer;" onclick="window.location.href='/kanban.html?task=${task.id}'">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                             <div>
                                 <h4 style="margin: 0; color: var(--text-primary);">${task.title}</h4>
@@ -506,7 +593,7 @@ class CRMApp {
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="task-priority priority-${task.priority}">${task.priority}</span>
-                                <button class="btn btn-secondary" onclick="event.stopPropagation(); window.location.href='index.html?task=${task.id}'" title="Open Task">
+                                <button class="btn btn-secondary" onclick="event.stopPropagation(); window.location.href='/kanban.html?task=${task.id}'" title="Open Task">
                                     <i class="fas fa-external-link-alt"></i> Open
                                 </button>
                         </div>
@@ -559,6 +646,74 @@ class CRMApp {
                         <p>No to-dos for this client yet.</p>
                     </div>`
                 }
+            </div>
+        `;
+    }
+
+    renderOpportunitiesTab(client) {
+        const opportunities = client.opportunities || [];
+        
+        if (opportunities.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="fas fa-lightbulb"></i>
+                    <h3>No Opportunities</h3>
+                    <p>No opportunities recorded for this client yet.</p>
+                    <button class="btn btn-primary" onclick="crmApp.addOpportunity(${client.id})">
+                        <i class="fas fa-plus"></i> Add Opportunity
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="opportunities-header">
+                <h3>Opportunities for ${client.name}</h3>
+                <div class="opportunities-actions">
+                    <button class="btn btn-primary" onclick="crmApp.addOpportunity(${client.id})">
+                        <i class="fas fa-plus"></i> Add Opportunity
+                    </button>
+                    <button class="btn btn-secondary" onclick="crmApp.exportOpportunities(${client.id})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn btn-secondary" onclick="crmApp.refreshOpportunitiesTab()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="opportunities-container">
+                ${opportunities.map(opportunity => `
+                    <div class="opportunity-card" onclick="crmApp.viewOpportunity(${client.id}, ${opportunity.id})">
+                        <div class="opportunity-content">
+                            <div class="opportunity-row-1">
+                                <div class="opportunity-title">
+                                    <h4>${opportunity.title || 'Untitled Opportunity'}</h4>
+                                </div>
+                                <div class="opportunity-info">
+                                    <span><strong>Owner:</strong> ${opportunity.owner_name || 'Unassigned'}</span>
+                                    <span><strong>Close Date:</strong> ${opportunity.close_date ? this.formatDate(opportunity.close_date) : 'Not set'}</span>
+                                    <span><strong>Created:</strong> ${this.formatDate(opportunity.created_at)}</span>
+                                </div>
+                                <div class="forecast-section">
+                                    <div class="probability-bar">
+                                        <div class="probability-label">
+                                            <span>${opportunity.probability || 0}%</span>
+                                        </div>
+                                        <div class="probability-progress">
+                                            <div class="probability-fill" style="width: ${opportunity.probability || 0}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="revenue-info">
+                                        <span class="revenue-value">$${opportunity.revenue ? opportunity.revenue.toLocaleString() : '0'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         `;
     }
@@ -859,7 +1014,7 @@ class CRMApp {
 
     async createTask(clientId) {
 
-        window.location.href = `index.html?client=${clientId}`;
+        window.location.href = `/kanban.html?client=${clientId}`;
     }
 
     async addTodo(clientId) {
@@ -899,14 +1054,12 @@ class CRMApp {
         }
 
         try {
-            await this.apiCall(`crm-attachments&client_id=${clientId}&attachment_id=${attachmentId}`, 'DELETE');
-            this.showNotification('Attachment deleted successfully!', 'success');
-
-            // Refresh only the attachments tab
+            await this.apiCall(`attachments&id=${attachmentId}`, 'DELETE');
+            this.showNotification('Attachment deleted successfully', 'success');
             await this.refreshAttachmentsTab();
         } catch (error) {
             console.error('Error deleting attachment:', error);
-            this.showNotification('Error deleting attachment: ' + error.message, 'error');
+            this.showNotification('Error deleting attachment', 'error');
         }
     }
 
@@ -1078,10 +1231,9 @@ class CRMApp {
                                         <button class="btn btn-text" style="width: 100%; text-align: left; padding: 0.5rem 0.75rem; border: none; border-radius: 0; border-top: 1px solid var(--border-color); color: var(--danger-color);" onclick="crmApp.deleteContact(${this.currentClient.id}, ${contact.id})">
                                             <i class="fas fa-trash"></i> Delete
                                         </button>
-                                    </div>
                                 </div>
-                                <span style="color: var(--primary-color); font-weight: 500; cursor: pointer;" onclick="crmApp.viewContact(${this.currentClient.id}, ${contact.id})">${contact.name}</span>
                             </div>
+                                <span style="color: var(--primary-color); font-weight: 500; cursor: pointer;" onclick="crmApp.viewContact(${this.currentClient.id}, ${contact.id})">${contact.name}</span>
                         </td>
                         <td style="padding: 0.75rem;">${contact.phone || '-'}</td>
                         <td style="padding: 0.75rem;">${contact.mobile_phone || '-'}</td>
@@ -1310,7 +1462,7 @@ class CRMApp {
     }
 
     goToKanban() {
-        window.location.href = 'index.html';
+        window.location.href = '/kanban.html';
     }
 
     showNotification(message, type = 'info') {
@@ -1784,14 +1936,12 @@ class CRMApp {
         }
 
         try {
-            await this.apiCall(`crm-attachments&client_id=${clientId}&attachment_id=${attachmentId}`, 'DELETE');
-            this.showNotification('Attachment deleted successfully!', 'success');
-
-            // Refresh only the attachments tab
+            await this.apiCall(`attachments&id=${attachmentId}`, 'DELETE');
+            this.showNotification('Attachment deleted successfully', 'success');
             await this.refreshAttachmentsTab();
         } catch (error) {
             console.error('Error deleting attachment:', error);
-            this.showNotification('Error deleting attachment: ' + error.message, 'error');
+            this.showNotification('Error deleting attachment', 'error');
         }
     }
 
@@ -2172,7 +2322,7 @@ class CRMApp {
                 accountManagerSelect.innerHTML = '<option value="">Select Account Manager...</option>';
                 this.users.forEach(user => {
                     const option = document.createElement('option');
-                    option.value = user.id;
+                    option.value = user.id.toString();
                     option.textContent = user.name;
                     accountManagerSelect.appendChild(option);
                 });
@@ -2186,7 +2336,7 @@ class CRMApp {
                 editAccountManagerSelect.innerHTML = '<option value="">Select Account Manager...</option>';
                 this.users.forEach(user => {
                     const option = document.createElement('option');
-                    option.value = user.id;
+                    option.value = user.id.toString();
                     option.textContent = user.name;
                     editAccountManagerSelect.appendChild(option);
                 });
@@ -2383,6 +2533,1914 @@ class CRMApp {
             }
         }
     }
+
+    renderAssetsTab(client) {
+        console.log('Rendering assets for client:', client);
+        console.log('Assets:', client.assets);
+
+        if (!client.assets || client.assets.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="fas fa-server"></i>
+                    <h3>No Assets</h3>
+                    <p>No IT assets for this client yet.</p>
+                    <button class="btn btn-primary" onclick="crmApp.addAsset(${client.id})">
+                        <i class="fas fa-plus"></i> Add First Asset
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn btn-primary" onclick="crmApp.addAsset(${client.id})">
+                        <i class="fas fa-plus"></i> Add Asset
+                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="crmApp.exportAssets(${client.id})">
+                            <i class="fas fa-download"></i> Export Assets
+                        </button>
+                        <button class="btn btn-icon" title="Refresh" onclick="crmApp.refreshAssetsTab()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                ${client.assets.map(asset => `
+                    <div class="card" style="margin-bottom: 1rem; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0; color: var(--text-primary);">${asset.name}</h4>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);">
+                                    ${asset.type} • ${asset.model || 'No model'} • ${asset.serial_number || 'No serial'}
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span class="asset-status status-${asset.status || 'active'}" style="padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                                    ${asset.status || 'active'}
+                                </span>
+                                <button class="btn btn-secondary" onclick="crmApp.editAsset(${client.id}, ${asset.id})" title="Edit Asset">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="btn btn-danger" onclick="crmApp.deleteAsset(${client.id}, ${asset.id})" title="Delete Asset">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            ${asset.location ? `<span><i class="fas fa-map-marker-alt"></i> ${asset.location}</span>` : ''}
+                            ${asset.ip_address ? `<span style="margin-left: 1rem;"><i class="fas fa-network-wired"></i> ${asset.ip_address}</span>` : ''}
+                            ${asset.purchase_date ? `<span style="margin-left: 1rem;"><i class="fas fa-calendar"></i> Purchased: ${this.formatDate(asset.purchase_date)}</span>` : ''}
+                            ${asset.warranty_expiry ? `<span style="margin-left: 1rem;"><i class="fas fa-shield-alt"></i> Warranty: ${this.formatDate(asset.warranty_expiry)}</span>` : ''}
+                        </div>
+                        ${asset.notes ? `<div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);"><i class="fas fa-sticky-note"></i> ${asset.notes}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async addAsset(clientId) {
+        const modal = document.createElement('div');
+        modal.className = 'modal show';
+        modal.style.zIndex = '10000';
+        
+        modal.innerHTML = `
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h2>Add Asset</h2>
+                    <button class="btn btn-icon" onclick="this.closest('.modal').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="addAssetForm" onsubmit="crmApp.submitAsset(event)" data-client-id="${clientId}" data-asset-id="">
+                    <div class="modal-body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="assetName">Asset Name <span class="required">*</span></label>
+                                <input type="text" id="assetName" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetType">Asset Type <span class="required">*</span></label>
+                                <select id="assetType" name="type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Desktop">Desktop</option>
+                                    <option value="Laptop">Laptop</option>
+                                    <option value="Server">Server</option>
+                                    <option value="Router">Router</option>
+                                    <option value="Switch">Switch</option>
+                                    <option value="Firewall">Firewall</option>
+                                    <option value="Access Point">Access Point</option>
+                                    <option value="Printer">Printer</option>
+                                    <option value="Scanner">Scanner</option>
+                                    <option value="UPS">UPS</option>
+                                    <option value="NAS">NAS</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetModel">Model</label>
+                                <input type="text" id="assetModel" name="model">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetSerial">Serial Number</label>
+                                <input type="text" id="assetSerial" name="serial_number">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetStatus">Status</label>
+                                <select id="assetStatus" name="status">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="retired">Retired</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetLocation">Location</label>
+                                <input type="text" id="assetLocation" name="location">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetIpAddress">IP Address</label>
+                                <input type="text" id="assetIpAddress" name="ip_address">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetPurchaseDate">Purchase Date</label>
+                                <input type="date" id="assetPurchaseDate" name="purchase_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="assetWarrantyExpiry">Warranty Expiry</label>
+                                <input type="date" id="assetWarrantyExpiry" name="warranty_expiry">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="assetNotes">Notes</label>
+                            <textarea id="assetNotes" name="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Asset</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+
+    async editAsset(clientId, assetId) {
+        try {
+            const asset = await this.apiCall(`assets&id=${assetId}`);
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal show';
+            modal.style.zIndex = '10000';
+            
+            modal.innerHTML = `
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h2>Edit Asset</h2>
+                        <button class="btn btn-icon" onclick="this.closest('.modal').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form id="editAssetForm" onsubmit="crmApp.submitAsset(event)" data-client-id="${clientId}" data-asset-id="${assetId}">
+                        <div class="modal-body">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="assetName">Asset Name <span class="required">*</span></label>
+                                    <input type="text" id="assetName" name="name" value="${asset.name || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetType">Asset Type <span class="required">*</span></label>
+                                    <select id="assetType" name="type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="Desktop" ${asset.type === 'Desktop' ? 'selected' : ''}>Desktop</option>
+                                        <option value="Laptop" ${asset.type === 'Laptop' ? 'selected' : ''}>Laptop</option>
+                                        <option value="Server" ${asset.type === 'Server' ? 'selected' : ''}>Server</option>
+                                        <option value="Router" ${asset.type === 'Router' ? 'selected' : ''}>Router</option>
+                                        <option value="Switch" ${asset.type === 'Switch' ? 'selected' : ''}>Switch</option>
+                                        <option value="Firewall" ${asset.type === 'Firewall' ? 'selected' : ''}>Firewall</option>
+                                        <option value="Access Point" ${asset.type === 'Access Point' ? 'selected' : ''}>Access Point</option>
+                                        <option value="Printer" ${asset.type === 'Printer' ? 'selected' : ''}>Printer</option>
+                                        <option value="Scanner" ${asset.type === 'Scanner' ? 'selected' : ''}>Scanner</option>
+                                        <option value="UPS" ${asset.type === 'UPS' ? 'selected' : ''}>UPS</option>
+                                        <option value="NAS" ${asset.type === 'NAS' ? 'selected' : ''}>NAS</option>
+                                        <option value="Other" ${asset.type === 'Other' ? 'selected' : ''}>Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetModel">Model</label>
+                                    <input type="text" id="assetModel" name="model" value="${asset.model || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetSerial">Serial Number</label>
+                                    <input type="text" id="assetSerial" name="serial_number" value="${asset.serial_number || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetStatus">Status</label>
+                                    <select id="assetStatus" name="status">
+                                        <option value="active" ${asset.status === 'active' ? 'selected' : ''}>Active</option>
+                                        <option value="inactive" ${asset.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                                        <option value="maintenance" ${asset.status === 'maintenance' ? 'selected' : ''}>Maintenance</option>
+                                        <option value="retired" ${asset.status === 'retired' ? 'selected' : ''}>Retired</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetLocation">Location</label>
+                                    <input type="text" id="assetLocation" name="location" value="${asset.location || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetIpAddress">IP Address</label>
+                                    <input type="text" id="assetIpAddress" name="ip_address" value="${asset.ip_address || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetPurchaseDate">Purchase Date</label>
+                                    <input type="date" id="assetPurchaseDate" name="purchase_date" value="${asset.purchase_date || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="assetWarrantyExpiry">Warranty Expiry</label>
+                                    <input type="date" id="assetWarrantyExpiry" name="warranty_expiry" value="${asset.warranty_expiry || ''}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="assetNotes">Notes</label>
+                                <textarea id="assetNotes" name="notes" rows="3">${asset.notes || ''}</textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Update Asset</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        } catch (error) {
+            console.error('Error loading asset:', error);
+            this.showNotification('Error loading asset details', 'error');
+        }
+    }
+
+    async deleteAsset(clientId, assetId) {
+        if (!confirm('Are you sure you want to delete this asset?')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`assets&id=${assetId}`, 'DELETE');
+            this.showNotification('Asset deleted successfully', 'success');
+            await this.refreshAssetsTab();
+        } catch (error) {
+            console.error('Error deleting asset:', error);
+            this.showNotification('Error deleting asset', 'error');
+        }
+    }
+
+    async submitAsset(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const clientId = event.target.dataset.clientId;
+        const assetId = event.target.dataset.assetId;
+        
+        const data = {
+            client_id: clientId,
+            name: formData.get('name'),
+            type: formData.get('type'),
+            model: formData.get('model') || null,
+            serial_number: formData.get('serial_number') || null,
+            status: formData.get('status') || 'active',
+            location: formData.get('location') || null,
+            ip_address: formData.get('ip_address') || null,
+            purchase_date: formData.get('purchase_date') || null,
+            warranty_expiry: formData.get('warranty_expiry') || null,
+            notes: formData.get('notes') || null
+        };
+        
+        try {
+            if (assetId) {
+                // Update existing asset
+                await this.apiCall(`assets&id=${assetId}`, 'PUT', data);
+                this.showNotification('Asset updated successfully', 'success');
+            } else {
+                // Create new asset
+                await this.apiCall('assets', 'POST', data);
+                this.showNotification('Asset added successfully', 'success');
+            }
+            
+            event.target.closest('.modal').remove();
+            await this.refreshAssetsTab();
+        } catch (error) {
+            console.error('Error saving asset:', error);
+            this.showNotification('Error saving asset', 'error');
+        }
+    }
+
+    async refreshAssetsTab() {
+        if (this.currentClient) {
+            try {
+                const client = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
+                this.currentClient = client;
+                this.showClientDetail(client);
+            } catch (error) {
+                console.error('Error refreshing assets tab:', error);
+            }
+        }
+    }
+
+    async exportAssets(clientId) {
+        try {
+            const response = await fetch(`api.php?endpoint=assets&client_id=${clientId}&export=1`);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `assets-${clientId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            this.showNotification('Assets exported successfully!', 'success');
+        } catch (error) {
+            console.error('Error exporting assets:', error);
+            this.showNotification('Error exporting assets: ' + error.message, 'error');
+        }
+    }
+
+    // Company Search Functionality
+    async searchCompany() {
+        const searchTerm = document.getElementById('clientName').value.trim();
+        if (!searchTerm) {
+            this.showNotification('Please enter a company name or phone number to search.', 'error');
+            return;
+        }
+        
+        const resultsContainer = document.getElementById('companySearchResults');
+        resultsContainer.innerHTML = '<div style="text-align: center; padding: 1rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+        resultsContainer.style.display = 'block';
+        
+        try {
+            // Call the company lookup API
+            const response = await fetch(`api.php?endpoint=company-lookup&q=${encodeURIComponent(searchTerm)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            this.displayCompanyResults(data.results || []);
+        } catch (error) {
+            this.showNotification('Error searching for company: ' + error.message, 'error');
+            resultsContainer.style.display = 'none';
+        }
+    }
+
+    displayCompanyResults(results) {
+        const container = document.getElementById('companySearchResults');
+        
+        // Store results globally for selection
+        this.companySearchResults = results;
+        
+        if (results.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 1rem; color: var(--text-secondary);">No companies found.</div>';
+            return;
+        }
+        
+        container.innerHTML = results.map((company, index) => `
+            <div class="company-result" onclick="crmApp.selectCompany(${index})">
+                <div class="company-name">
+                    ${company.name}
+                    ${company.confidence ? `<span style="color: var(--success-color); font-size: 0.75rem; margin-left: 0.5rem;">(${Math.round(company.confidence * 100)}% match)</span>` : ''}
+                    ${company.source ? `<span style="color: var(--info-color); font-size: 0.75rem; margin-left: 0.5rem;">[${company.source}]</span>` : ''}
+                    ${company.rating ? `<span style="color: var(--warning-color); font-size: 0.75rem; margin-left: 0.5rem;">⭐ ${company.rating}/5</span>` : ''}
+                </div>
+                <div class="company-details">
+                    <div><i class="fas fa-phone"></i> ${company.phone || 'N/A'}</div>
+                    <div><i class="fas fa-envelope"></i> ${company.email || 'N/A'}</div>
+                    <div><i class="fas fa-globe"></i> ${company.website || 'N/A'}</div>
+                    <div><i class="fas fa-map-marker-alt"></i> ${company.address || 'N/A'}</div>
+                    ${company.description ? `<div><i class="fas fa-info-circle"></i> ${company.description}</div>` : ''}
+                    ${company.user_ratings_total ? `<div><i class="fas fa-users"></i> ${company.user_ratings_total} reviews</div>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    selectCompany(index) {
+        // Get the selected company data from stored results
+        const company = this.companySearchResults[index];
+        
+        if (!company) {
+            this.showNotification('Company data not found', 'error');
+            return;
+        }
+        
+        // Populate the form fields
+        document.getElementById('clientName').value = company.name;
+        document.getElementById('clientEmail').value = company.email !== 'N/A' ? company.email : '';
+        document.getElementById('clientNumber').value = company.phone !== 'N/A' ? company.phone : '';
+        document.getElementById('clientUrl').value = company.website !== 'N/A' ? company.website : '';
+        
+        // Parse address if available
+        if (company.address && company.address !== 'N/A') {
+            this.parseAddress(company.address);
+        }
+        
+        // Hide the search results
+        document.getElementById('companySearchResults').style.display = 'none';
+        
+        this.showNotification('Company information filled successfully!', 'success');
+    }
+
+    parseAddress(address) {
+        // Simple address parsing - you might want to improve this
+        const addressParts = address.split(',').map(part => part.trim());
+        
+        if (addressParts.length >= 3) {
+            // Assume format: Street, City, State ZIP
+            document.getElementById('address1').value = addressParts[0] || '';
+            document.getElementById('city').value = addressParts[1] || '';
+            
+            const stateZip = addressParts[2] || '';
+            const stateZipParts = stateZip.split(' ');
+            if (stateZipParts.length >= 2) {
+                document.getElementById('state').value = stateZipParts[0] || '';
+                document.getElementById('zipCode').value = stateZipParts[1] || '';
+            }
+        }
+    }
+
+    // TBR Meeting Functions
+    renderTbrTab(client) {
+        const meetings = client.tbrMeetings || [];
+        
+        if (meetings.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h3>No TBR Meetings</h3>
+                    <p>No Technology Business Review meetings scheduled</p>
+                    <button class="btn btn-primary" onclick="crmApp.showTbrMeetingModal(${client.id})">
+                        <i class="fas fa-plus"></i> Schedule TBR Meeting
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="tbr-header">
+                <h3>Business Review Meetings for ${client.name}</h3>
+                <div class="tbr-actions">
+                    <button class="btn btn-primary" onclick="crmApp.showTbrMeetingModal(${client.id})">
+                        <i class="fas fa-plus"></i> Add New Meeting
+                    </button>
+                    <button class="btn btn-secondary" onclick="crmApp.exportTbrMeetings(${client.id})">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn btn-secondary" onclick="crmApp.refreshTbrTab()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="tbr-table-container">
+                <table class="tbr-table">
+                    <thead>
+                        <tr>
+                            <th>Meeting Date</th>
+                            <th>Meeting Type</th>
+                            <th>Primary Contact</th>
+                            <th>Account Manager</th>
+                            <th>Status</th>
+                            <th>Notes</th>
+                            <th>Recommendations</th>
+                            <th>Reports / Artifacts</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${meetings.map(meeting => `
+                            <tr class="meeting-row ${meeting.status}" onclick="crmApp.showTbrMeetingDetail(${meeting.id})">
+                                <td class="meeting-date">${this.formatDate(meeting.meeting_date)}</td>
+                                <td class="meeting-type">${meeting.meeting_type}</td>
+                                <td class="primary-contact">${meeting.primary_contact || ''}</td>
+                                <td class="account-manager">${meeting.account_manager_name || ''}</td>
+                                <td class="status">
+                                    <span class="status-badge status-${meeting.status}">${meeting.status}</span>
+                                </td>
+                                <td class="notes-preview">${this.truncateText(meeting.notes || '', 100)}</td>
+                                <td class="recommendations-preview">${this.truncateText(meeting.recommendations || '', 100)}</td>
+                                <td class="attachments">
+                                    ${meeting.attachments && meeting.attachments.length > 0 ? 
+                                        `<a href="#" onclick="crmApp.showTbrAttachments(${meeting.id}); event.stopPropagation();">
+                                            ${meeting.attachments.length} file(s)
+                                        </a>` : 
+                                        'No files'
+                                    }
+                                </td>
+                                <td class="actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="crmApp.editTbrMeeting(${meeting.id}); event.stopPropagation();">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="crmApp.deleteTbrMeeting(${meeting.id}); event.stopPropagation();">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    async showTbrMeetingModal(clientId, meetingId = null) {
+        // Ensure users are loaded before creating the modal
+        if (!this.users || this.users.length === 0) {
+            await this.loadUsers();
+        }
+        
+        // If editing, get the meeting data first
+        let meetingData = null;
+        if (meetingId) {
+            try {
+                meetingData = await this.apiCall(`tbr-meetings&id=${meetingId}`);
+            } catch (error) {
+                console.error('Failed to load meeting data:', error);
+            }
+        }
+        
+        const modalHtml = `
+            <div id="tbrMeetingModal" class="modal">
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h2>${meetingId ? 'Edit' : 'New'} TBR Meeting</h2>
+                        <button class="btn btn-icon" onclick="crmApp.hideTbrMeetingModal()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form id="tbrMeetingForm" onsubmit="crmApp.saveTbrMeeting(event, ${clientId}, ${meetingId})">
+                        <div class="modal-body">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="meetingDate">Meeting Date <span class="required">*</span></label>
+                                    <input type="date" id="meetingDate" name="meeting_date" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="meetingType">Meeting Type</label>
+                                    <select id="meetingType" name="meeting_type">
+                                        <option value="Business Review">Business Review</option>
+                                        <option value="Technical Review">Technical Review</option>
+                                        <option value="Quarterly Review">Quarterly Review</option>
+                                        <option value="Annual Review">Annual Review</option>
+                                        <option value="Security Review">Security Review</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="primaryContact">Primary Contact</label>
+                                    <input type="text" id="primaryContact" name="primary_contact">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="accountManager">Account Manager</label>
+                                    <select id="accountManager" name="account_manager_id">
+                                        <option value="">Select Account Manager</option>
+                                        ${this.users ? this.users.map(user => `
+                                            <option value="${user.id.toString()}" ${meetingData && meetingData.account_manager_id == user.id ? 'selected' : ''}>${user.name}</option>
+                                        `).join('') : ''}
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="meetingStatus">Status</label>
+                                    <select id="meetingStatus" name="status">
+                                        <option value="scheduled">Scheduled</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="meetingNotes">Meeting Notes</label>
+                                <textarea id="meetingNotes" name="notes" rows="8" 
+                                    placeholder="• Budget & Lifecycle Replacement Review.&#10;• Review Asset List&#10;• 8 computers and 1 server are on plan&#10;  • Managed cloud backups are on the server&#10;• 1 computer MUST to be replaced (or retired) because it will not upgrade to Windows 11."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="recommendations">Recommendations</label>
+                                <textarea id="recommendations" name="recommendations" rows="6" 
+                                    placeholder="• Upgrade ABA-DT-07 (Charlene-PC) - 10.5 yrs old&#10;• Permission to Quote&#10;• 7 Computers will need to be upgraded to Windows 11 (or replaced) by 2025"></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Meeting Attendees</label>
+                                <div id="attendeesContainer">
+                                    <div class="attendee-row">
+                                        <input type="text" placeholder="Name" name="attendee_name[]">
+                                        <input type="email" placeholder="Email" name="attendee_email[]">
+                                        <button type="button" class="btn btn-primary" onclick="crmApp.addAttendeeRow()">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="crmApp.hideTbrMeetingModal()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Meeting
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if present
+        const existingModal = document.getElementById('tbrMeetingModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Show modal
+        document.getElementById('tbrMeetingModal').style.display = 'block';
+        
+        // Load meeting data if editing
+        if (meetingId && meetingData) {
+            // Populate form fields
+            document.getElementById('meetingDate').value = meetingData.meeting_date;
+            document.getElementById('meetingType').value = meetingData.meeting_type;
+            document.getElementById('primaryContact').value = meetingData.primary_contact || '';
+            document.getElementById('meetingStatus').value = meetingData.status;
+            document.getElementById('meetingNotes').value = meetingData.notes || '';
+            document.getElementById('recommendations').value = meetingData.recommendations || '';
+            
+            // Clear existing attendees
+            const attendeesContainer = document.getElementById('attendeesContainer');
+            attendeesContainer.innerHTML = '';
+            
+            // Add attendees
+            if (meetingData.attendees && meetingData.attendees.length > 0) {
+                meetingData.attendees.forEach(attendee => {
+                    const attendeeRow = document.createElement('div');
+                    attendeeRow.className = 'attendee-row';
+                    attendeeRow.innerHTML = `
+                        <input type="text" placeholder="Name" name="attendee_name[]" value="${attendee.name || ''}">
+                        <input type="email" placeholder="Email" name="attendee_email[]" value="${attendee.email || ''}">
+                        <button type="button" class="btn btn-secondary" onclick="this.parentElement.remove()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    `;
+                    attendeesContainer.appendChild(attendeeRow);
+                });
+            }
+            
+            // Always add one row with the "+" button at the end
+            const addRow = document.createElement('div');
+            addRow.className = 'attendee-row';
+            addRow.innerHTML = `
+                <input type="text" placeholder="Name" name="attendee_name[]">
+                <input type="email" placeholder="Email" name="attendee_email[]">
+                <button type="button" class="btn btn-primary" onclick="crmApp.addAttendeeRow()">
+                    <i class="fas fa-plus"></i>
+                </button>
+            `;
+            attendeesContainer.appendChild(addRow);
+        }
+    }
+
+    hideTbrMeetingModal() {
+        const modal = document.getElementById('tbrMeetingModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    addAttendeeRow() {
+        const container = document.getElementById('attendeesContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'attendee-row';
+        newRow.innerHTML = `
+            <input type="text" placeholder="Name" name="attendee_name[]">
+            <input type="email" placeholder="Email" name="attendee_email[]">
+            <button type="button" class="btn btn-secondary" onclick="this.parentElement.remove()">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        container.appendChild(newRow);
+    }
+
+    async saveTbrMeeting(event, clientId, meetingId = null) {
+        event.preventDefault();
+        
+        try {
+            const formData = new FormData(event.target);
+            const data = {
+                client_id: clientId,
+                meeting_date: formData.get('meeting_date'),
+                meeting_type: formData.get('meeting_type'),
+                primary_contact: formData.get('primary_contact'),
+                account_manager_id: formData.get('account_manager_id'),
+                status: formData.get('status'),
+                notes: formData.get('notes'),
+                recommendations: formData.get('recommendations'),
+                attendees: []
+            };
+            
+            // Collect attendees
+            const names = formData.getAll('attendee_name[]');
+            const emails = formData.getAll('attendee_email[]');
+            for (let i = 0; i < names.length; i++) {
+                if (names[i] && names[i].trim() && emails[i] && emails[i].trim()) {
+                    data.attendees.push({
+                        name: names[i].trim(),
+                        email: emails[i].trim()
+                    });
+                }
+            }
+            
+            const method = meetingId ? 'PUT' : 'POST';
+            const endpoint = meetingId ? `tbr-meetings&id=${meetingId}` : 'tbr-meetings';
+            
+            await this.apiCall(endpoint, method, data);
+            
+            this.hideTbrMeetingModal();
+            this.showNotification(`TBR meeting ${meetingId ? 'updated' : 'created'} successfully!`, 'success');
+            
+            // Refresh the client data
+            if (this.currentClient) {
+                const updatedClient = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
+                this.showClientDetail(updatedClient);
+            }
+            
+        } catch (error) {
+            console.error('Failed to save TBR meeting:', error);
+            this.showNotification('Failed to save TBR meeting: ' + error.message, 'error');
+        }
+    }
+
+    async showTbrMeetingDetail(meetingId) {
+        try {
+            const meeting = await this.apiCall(`tbr-meetings&id=${meetingId}`);
+            
+            const modalHtml = `
+                <div id="tbrMeetingDetailModal" class="modal">
+                    <div class="modal-content large">
+                        <div class="modal-header">
+                            <h2>TBR Meeting Details</h2>
+                            <button class="btn btn-icon" onclick="crmApp.hideTbrMeetingDetailModal()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="meeting-details">
+                                <div class="detail-row">
+                                    <label>Meeting Date:</label>
+                                    <span>${this.formatDate(meeting.meeting_date)}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>Meeting Type:</label>
+                                    <span>${meeting.meeting_type}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>Primary Contact:</label>
+                                    <span>${meeting.primary_contact || 'Not specified'}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>Account Manager:</label>
+                                    <span>${meeting.account_manager_name || 'Not assigned'}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <label>Status:</label>
+                                    <span class="status-badge status-${meeting.status}">${meeting.status}</span>
+                                </div>
+                                
+                                ${meeting.notes ? `
+                                    <div class="detail-section">
+                                        <h3>Meeting Notes</h3>
+                                        <div class="notes-content">${meeting.notes.replace(/\n/g, '<br>')}</div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${meeting.recommendations ? `
+                                    <div class="detail-section">
+                                        <h3>Recommendations</h3>
+                                        <div class="recommendations-content">${meeting.recommendations.replace(/\n/g, '<br>')}</div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${meeting.attendees && meeting.attendees.length > 0 ? `
+                                    <div class="detail-section">
+                                        <h3>Attendees</h3>
+                                        <div class="attendees-list">
+                                            ${meeting.attendees.map(attendee => `
+                                                <div class="attendee-item">
+                                                    <strong>${attendee.name}</strong>
+                                                    ${attendee.email ? `<br><small>${attendee.email}</small>` : ''}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${meeting.attachments && meeting.attachments.length > 0 ? `
+                                    <div class="detail-section">
+                                        <h3>Attachments</h3>
+                                        <div class="attachments-list">
+                                            ${meeting.attachments.map(attachment => `
+                                                <div class="attachment-item">
+                                                    <a href="api.php?endpoint=attachments&id=${attachment.id}" target="_blank">
+                                                        <i class="fas fa-file"></i> ${attachment.original_name}
+                                                    </a>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="crmApp.hideTbrMeetingDetailModal()">Close</button>
+                            <button type="button" class="btn btn-primary" onclick="crmApp.editTbrMeeting(${meeting.id})">Edit Meeting</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('tbrMeetingDetailModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            document.getElementById('tbrMeetingDetailModal').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Failed to load TBR meeting details:', error);
+            this.showNotification('Failed to load meeting details: ' + error.message, 'error');
+        }
+    }
+
+    hideTbrMeetingDetailModal() {
+        const modal = document.getElementById('tbrMeetingDetailModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    async editTbrMeeting(meetingId) {
+        try {
+            const meeting = await this.apiCall(`tbr-meetings&id=${meetingId}`);
+            const clientId = meeting.client_id;
+            
+            // Close detail modal if open
+            this.hideTbrMeetingDetailModal();
+            
+            // Show edit modal
+            await this.showTbrMeetingModal(clientId, meetingId);
+            
+        } catch (error) {
+            console.error('Failed to load TBR meeting for edit:', error);
+            this.showNotification('Failed to load meeting for edit: ' + error.message, 'error');
+        }
+    }
+
+    async deleteTbrMeeting(meetingId) {
+        if (confirm('Are you sure you want to delete this TBR meeting?')) {
+            try {
+                await this.apiCall(`tbr-meetings&id=${meetingId}`, 'DELETE');
+                this.showNotification('TBR meeting deleted successfully', 'success');
+                this.refreshTbrTab();
+                this.hideTbrMeetingDetailModal();
+            } catch (error) {
+                console.error('Failed to delete TBR meeting:', error);
+                this.showNotification('Failed to delete meeting: ' + error.message, 'error');
+            }
+        }
+    }
+
+
+
+    async showTbrAttachments(meetingId) {
+        try {
+            const meeting = await this.apiCall(`tbr-meetings&id=${meetingId}`);
+            
+            if (!meeting.attachments || meeting.attachments.length === 0) {
+                this.showNotification('No attachments found for this meeting.', 'info');
+                return;
+            }
+            
+            const modalHtml = `
+                <div id="tbrAttachmentsModal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Meeting Attachments</h2>
+                            <button class="btn btn-icon" onclick="crmApp.hideTbrAttachmentsModal()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="attachments-list">
+                                ${meeting.attachments.map(attachment => `
+                                    <div class="attachment-item">
+                                        <a href="api.php?endpoint=attachments&id=${attachment.id}" target="_blank" class="attachment-link">
+                                            <i class="fas fa-file"></i> ${attachment.original_name}
+                                        </a>
+                                        <small>${this.formatFileSize(attachment.file_size || 0)}</small>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="crmApp.hideTbrAttachmentsModal()">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('tbrAttachmentsModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            document.getElementById('tbrAttachmentsModal').style.display = 'block';
+            
+        } catch (error) {
+            console.error('Failed to load TBR attachments:', error);
+            this.showNotification('Failed to load attachments: ' + error.message, 'error');
+        }
+    }
+
+    hideTbrAttachmentsModal() {
+        const modal = document.getElementById('tbrAttachmentsModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    async exportTbrMeetings(clientId) {
+        try {
+            const response = await fetch(`api.php?endpoint=tbr-meetings&client_id=${clientId}&export=true`);
+            const blob = await response.blob();
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tbr-meetings-${clientId}-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            this.showNotification('TBR meetings exported successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to export TBR meetings:', error);
+            this.showNotification('Failed to export TBR meetings: ' + error.message, 'error');
+        }
+    }
+
+    async refreshTbrTab() {
+        if (this.currentClient) {
+            try {
+                const updatedClient = await this.apiCall(`crm-client&id=${this.currentClient.id}`);
+                this.showClientDetail(updatedClient);
+                this.showNotification('TBR tab refreshed successfully!', 'success');
+            } catch (error) {
+                console.error('Failed to refresh TBR tab:', error);
+                this.showNotification('Failed to refresh TBR tab: ' + error.message, 'error');
+            }
+        }
+    }
+
+    formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit', 
+            day: '2-digit'
+        });
+    }
+
+    truncateText(text, maxLength) {
+        if (!text) return '';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    calculateDaysInPipeline(createdAt) {
+        if (!createdAt) return 0;
+        const created = new Date(createdAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - created);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    }
+
+    // Opportunity Management Methods
+    async addOpportunity(clientId) {
+        try {
+            // Ensure users are loaded before creating the modal
+            if (!this.users || this.users.length === 0) {
+                await this.loadUsers();
+            }
+            
+            // Double-check that users are loaded
+            if (!this.users || this.users.length === 0) {
+                console.warn('No users loaded, attempting to load again...');
+                await this.loadUsers();
+            }
+            
+            const modalHtml = `
+                <div class="modal" id="addOpportunityModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Add New Opportunity</h2>
+                            <span class="close" onclick="crmApp.hideAddOpportunityModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <form id="opportunityForm" onsubmit="crmApp.submitOpportunity(event)">
+                                <input type="hidden" id="opportunityClientId" name="clientId" value="${clientId}">
+                                <input type="hidden" id="opportunityId" name="opportunityId">
+                                
+                                <div class="form-group">
+                                    <label for="opportunityTitle">Opportunity Title</label>
+                                    <input type="text" id="opportunityTitle" name="title" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="opportunityDescription">Description</label>
+                                    <textarea id="opportunityDescription" name="description" rows="3"></textarea>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="opportunityRevenue">Revenue ($)</label>
+                                        <input type="number" id="opportunityRevenue" name="revenue" min="0" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="opportunityProbability">Probability (%)</label>
+                                        <input type="number" id="opportunityProbability" name="probability" min="0" max="100" value="0">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="opportunityStatus">Status</label>
+                                        <select id="opportunityStatus" name="status" required>
+                                            <option value="new">New</option>
+                                            <option value="qualified">Qualified</option>
+                                            <option value="proposal">Proposal</option>
+                                            <option value="negotiation">Negotiation</option>
+                                            <option value="won">Won</option>
+                                            <option value="lost">Lost</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="opportunityCloseDate">Close Date</label>
+                                        <input type="date" id="opportunityCloseDate" name="close_date">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="opportunityOwner">Owner</label>
+                                    <select id="opportunityOwner" name="owner_id">
+                                        <option value="">Select Owner</option>
+                                        ${this.users && this.users.length > 0 ? this.users.map(user => `
+                                            <option value="${user.id}">${user.name || user.full_name || 'Unknown User'}</option>
+                                        `).join('') : '<option value="">Loading users...</option>'}
+                                    </select>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">Save Opportunity</button>
+                                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddOpportunityModal()">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('addOpportunityModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            document.getElementById('addOpportunityModal').style.display = 'flex';
+            
+            // If users weren't loaded properly, try to reload them and update the dropdown
+            if (!this.users || this.users.length === 0) {
+                setTimeout(async () => {
+                    await this.loadUsers();
+                    const ownerSelect = document.getElementById('opportunityOwner');
+                    if (ownerSelect && this.users && this.users.length > 0) {
+                        ownerSelect.innerHTML = '<option value="">Select Owner</option>' + 
+                            this.users.map(user => `
+                                <option value="${user.id}">${user.name || user.full_name || 'Unknown User'}</option>
+                            `).join('');
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Error creating opportunity modal:', error);
+            this.showNotification('Failed to load opportunity form', 'error');
+        }
+    }
+
+    hideAddOpportunityModal() {
+        const modal = document.getElementById('addOpportunityModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    async editOpportunity(clientId, opportunityId) {
+        try {
+            const opportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
+            if (opportunity) {
+                // Ensure users are loaded
+                if (!this.users || this.users.length === 0) {
+                    await this.loadUsers();
+                }
+                
+                // First, create the modal if it doesn't exist
+                if (!document.getElementById('addOpportunityModal')) {
+                    await this.addOpportunity(clientId);
+                }
+                
+                // Populate the form with existing data
+                document.getElementById('opportunityId').value = opportunity.id;
+                document.getElementById('opportunityTitle').value = opportunity.title || '';
+                document.getElementById('opportunityDescription').value = opportunity.description || '';
+                document.getElementById('opportunityRevenue').value = opportunity.revenue || '';
+                document.getElementById('opportunityProbability').value = opportunity.probability || 0;
+                document.getElementById('opportunityStatus').value = opportunity.status || 'new';
+                document.getElementById('opportunityCloseDate').value = opportunity.close_date || '';
+                
+                // Populate the owner dropdown
+                const ownerSelect = document.getElementById('opportunityOwner');
+                if (ownerSelect) {
+                    ownerSelect.innerHTML = '<option value="">Select Owner</option>';
+                    if (this.users) {
+                        this.users.forEach(user => {
+                            const option = document.createElement('option');
+                            option.value = user.id;
+                            option.textContent = user.name || user.full_name || 'Unknown User';
+                            if (user.id == opportunity.owner_id) {
+                                option.selected = true;
+                            }
+                            ownerSelect.appendChild(option);
+                        });
+                    }
+                }
+                
+                // Update modal title
+                document.querySelector('#addOpportunityModal .modal-header h2').textContent = 'Edit Opportunity';
+                
+                // Show modal
+                document.getElementById('addOpportunityModal').style.display = 'flex';
+            }
+        } catch (error) {
+            console.error('Failed to load opportunity:', error);
+            this.showNotification('Failed to load opportunity details', 'error');
+        }
+    }
+
+    async viewOpportunity(clientId, opportunityId) {
+        try {
+            const opportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
+            if (opportunity) {
+                // Fetch notes for this opportunity
+                let notes = [];
+                try {
+                    notes = await this.apiCall(`opportunity-notes&opportunity_id=${opportunityId}`);
+                } catch (error) {
+                    console.warn('Failed to load notes:', error);
+                    notes = [];
+                }
+                
+                // Fetch attachments for this opportunity
+                let attachments = [];
+                try {
+                    attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
+                } catch (error) {
+                    console.warn('Failed to load attachments:', error);
+                    attachments = [];
+                }
+                
+                // Add notes and attachments to the opportunity object
+                opportunity.notes = notes;
+                opportunity.attachments = attachments;
+                
+                const modalHtml = `
+                    <div class="modal" id="viewOpportunityModal">
+                        <div class="modal-content opportunity-modal-large">
+                            <div class="modal-header">
+                                <div class="opportunity-header-main">
+                                    <div class="opportunity-title-section">
+                                        <h2>Opportunity - ID ${opportunity.id} - ${opportunity.title || 'Untitled Opportunity'}</h2>
+                                        <div class="opportunity-meta">
+                                            <span class="opportunity-id">ID ${opportunity.id}</span>
+                                            <span class="status-badge status-${opportunity.status || 'new'}">${opportunity.status || 'New'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="opportunity-header-actions">
+                                        <button class="btn btn-secondary" onclick="crmApp.editOpportunity(${clientId}, ${opportunity.id})">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                        <button class="btn btn-danger" onclick="crmApp.deleteOpportunity(${clientId}, ${opportunity.id})">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </div>
+                                <span class="close" onclick="crmApp.hideViewOpportunityModal()">&times;</span>
+                            </div>
+                            <div class="modal-body">
+                                <div class="opportunity-detail-container">
+                                    <!-- Left Column - Actions and Timeline -->
+                                    <div class="opportunity-left-column">
+                                        <div class="opportunity-actions-section">
+                                            <h3>Actions</h3>
+                                            <div class="action-buttons">
+                                                <button class="btn btn-primary" onclick="crmApp.editOpportunity(${clientId}, ${opportunity.id})">
+                                                    <i class="fas fa-edit"></i> Edit Opportunity
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="crmApp.addOpportunityNote(${opportunity.id})">
+                                                    <i class="fas fa-sticky-note"></i> Add Note
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="crmApp.addOpportunityAttachment(${opportunity.id})">
+                                                    <i class="fas fa-paperclip"></i> Add Attachment
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                         <div class="forecast-section">
+                                            <h3>Forecast</h3>
+                                            <div class="probability-bar">
+                                                <div class="probability-label">
+                                                    <span>${opportunity.probability || 0}% Probability</span>
+                                                </div>
+                                                <div class="probability-progress">
+                                                    <div class="probability-fill" style="width: ${opportunity.probability || 0}%"></div>
+                                                </div>
+                                            </div>
+                                            <div class="revenue-info">
+                                                <div class="revenue-item">
+                                                    <span class="revenue-label">Revenue:</span>
+                                                    <span class="revenue-value">$${opportunity.revenue ? opportunity.revenue.toLocaleString() : '0'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="opportunity-stats-section">
+                                            <h3>Statistics</h3>
+                                            <div class="stats-grid">
+                                                <div class="stat-item">
+                                                    <div class="stat-label">Days in Pipeline</div>
+                                                    <div class="stat-value">${this.calculateDaysInPipeline(opportunity.created_at)}</div>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <div class="stat-label">Notes Count</div>
+                                                    <div class="stat-value">${opportunity.notes ? opportunity.notes.length : 0}</div>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <div class="stat-label">Attachments</div>
+                                                    <div class="stat-value">${opportunity.attachments ? opportunity.attachments.length : 0}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="opportunity-timeline-section">
+                                            <h3>Timeline</h3>
+                                            <div class="timeline-container">
+                                                <div class="timeline-item">
+                                                    <div class="timeline-marker"></div>
+                                                    <div class="timeline-content">
+                                                        <div class="timeline-title">Opportunity Created</div>
+                                                        <div class="timeline-time">${this.formatDate(opportunity.created_at)}</div>
+                                                        <div class="timeline-user">by ${opportunity.created_by_name || 'Unknown User'}</div>
+                                                    </div>
+                                                </div>
+                                                ${opportunity.updated_at && opportunity.updated_at !== opportunity.created_at ? `
+                                                    <div class="timeline-item">
+                                                        <div class="timeline-marker"></div>
+                                                        <div class="timeline-content">
+                                                            <div class="timeline-title">Last Updated</div>
+                                                            <div class="timeline-time">${this.formatDate(opportunity.updated_at)}</div>
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                    
+                                    <!-- Center Column - Main Content -->
+                                    <div class="opportunity-center-column">
+                                        <div class="opportunity-info-section">
+                                            <h3>Opportunity Information</h3>
+                                            <div class="info-grid">
+                                                <div class="info-item">
+                                                    <label>Owner:</label>
+                                                    <span>${opportunity.owner_name || 'Unassigned'}</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <label>Close Date:</label>
+                                                    <span>${opportunity.close_date ? this.formatDate(opportunity.close_date) : 'Not set'}</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <label>Created:</label>
+                                                    <span>${this.formatDate(opportunity.created_at)}</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <label>Status:</label>
+                                                    <span class="status-badge status-${opportunity.status || 'new'}">${opportunity.status || 'New'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        ${opportunity.description ? `
+                                            <div class="opportunity-description-section">
+                                                <h3>Description</h3>
+                                                <div class="description-content">
+                                                    <p>${opportunity.description}</p>
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        <div class="opportunity-notes-section">
+                                            <div class="notes-header">
+                                                <h3>Notes</h3>
+                                                <button class="btn btn-primary btn-sm" onclick="crmApp.addOpportunityNote(${opportunity.id})">
+                                                    <i class="fas fa-plus"></i> Add Note
+                                                </button>
+                                            </div>
+                                            <div class="notes-list">
+                                                ${opportunity.notes && opportunity.notes.length > 0 ? 
+                                                    opportunity.notes.map(note => `
+                                                        <div class="note-item">
+                                                            <div class="note-header">
+                                                                <div class="note-user">
+                                                                    <span class="user-avatar">${note.user_name ? note.user_name.charAt(0).toUpperCase() : 'U'}</span>
+                                                                    <span class="user-name">${note.user_name || 'Unknown User'}</span>
+                                                                </div>
+                                                                <span class="note-time">${this.formatDate(note.created_at)}</span>
+                                                            </div>
+                                                            <div class="note-content">
+                                                                <p>${note.note_text}</p>
+                                                            </div>
+                                                        </div>
+                                                    `).join('') : 
+                                                    '<div class="no-notes">No notes yet. Add the first note!</div>'
+                                                }
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="opportunity-attachments-section">
+                                            <div class="attachments-header">
+                                                <h3>Attachments</h3>
+                                                <button class="btn btn-primary btn-sm" onclick="crmApp.addOpportunityAttachment(${opportunity.id})">
+                                                    <i class="fas fa-plus"></i> Add Attachment
+                                                </button>
+                                            </div>
+                                            <div class="attachments-container">
+                                                <div class="attachments-list">
+                                                    ${opportunity.attachments && opportunity.attachments.length > 0 ? 
+                                                        opportunity.attachments.map(attachment => `
+                                                            <div class="attachment-item">
+                                                                <div class="attachment-header">
+                                                                    <div class="attachment-icon">
+                                                                        <i class="fas fa-file"></i>
+                                                                    </div>
+                                                                    <div class="attachment-info">
+                                                                        <div class="attachment-title">${attachment.title}</div>
+                                                                        <div class="attachment-meta">
+                                                                            <span class="attachment-size">${this.formatFileSize(attachment.filesize)}</span>
+                                                                            <span class="attachment-date">${this.formatDate(attachment.created_at)}</span>
+                                                                            <span class="attachment-user">by ${attachment.user_name || 'Unknown User'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="attachment-actions">
+                                                                        <button class="btn btn-sm btn-secondary" onclick="crmApp.downloadOpportunityAttachment('${attachment.filename}')" title="Download">
+                                                                            <i class="fas fa-download"></i>
+                                                                        </button>
+                                                                        <button class="btn btn-sm btn-danger" onclick="crmApp.deleteOpportunityAttachment(${opportunity.id}, ${attachment.id})" title="Delete">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                ${attachment.description ? `
+                                                                    <div class="attachment-description">
+                                                                        <p>${attachment.description}</p>
+                                                                    </div>
+                                                                ` : ''}
+                                                            </div>
+                                                        `).join('') : 
+                                                        '<div class="no-attachments">No attachments yet. Add the first attachment!</div>'
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Remove existing modal if present
+                const existingModal = document.getElementById('viewOpportunityModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                // Add modal to body
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                
+                // Show modal
+                document.getElementById('viewOpportunityModal').style.display = 'flex';
+            }
+        } catch (error) {
+            console.error('Failed to load opportunity:', error);
+            this.showNotification('Failed to load opportunity details', 'error');
+        }
+    }
+
+    hideViewOpportunityModal() {
+        const modal = document.getElementById('viewOpportunityModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    async deleteOpportunity(clientId, opportunityId) {
+        if (confirm('Are you sure you want to delete this opportunity?')) {
+            try {
+                await this.apiCall(`opportunities&id=${opportunityId}`, 'DELETE');
+                this.showNotification('Opportunity deleted successfully', 'success');
+                await this.refreshOpportunitiesTab();
+            } catch (error) {
+                console.error('Failed to delete opportunity:', error);
+                this.showNotification('Failed to delete opportunity', 'error');
+            }
+        }
+    }
+
+    async submitOpportunity(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const opportunityId = formData.get('opportunityId');
+        
+        const opportunityData = {
+            client_id: formData.get('clientId'),
+            title: formData.get('title'),
+            description: formData.get('description'),
+            revenue: parseFloat(formData.get('revenue')) || 0,
+            probability: parseInt(formData.get('probability')) || 0,
+            status: formData.get('status'),
+            close_date: formData.get('close_date'),
+            owner_id: formData.get('owner_id') || null
+        };
+        
+        try {
+            if (opportunityId) {
+                // Update existing opportunity
+                await this.apiCall(`opportunities&id=${opportunityId}`, 'PUT', opportunityData);
+                this.showNotification('Opportunity updated successfully', 'success');
+            } else {
+                // Create new opportunity
+                await this.apiCall('opportunities', 'POST', opportunityData);
+                this.showNotification('Opportunity created successfully', 'success');
+            }
+            
+            this.hideAddOpportunityModal();
+            await this.refreshOpportunitiesTab();
+        } catch (error) {
+            console.error('Failed to save opportunity:', error);
+            this.showNotification('Failed to save opportunity', 'error');
+        }
+    }
+
+    async exportOpportunities(clientId) {
+        try {
+            const response = await this.apiCall(`opportunities&client_id=${clientId}&export=1`);
+            if (response.download_url) {
+                window.open(response.download_url, '_blank');
+            } else {
+                this.showNotification('Export feature not available', 'warning');
+            }
+        } catch (error) {
+            console.error('Failed to export opportunities:', error);
+            this.showNotification('Failed to export opportunities', 'error');
+        }
+    }
+
+    async refreshOpportunitiesTab() {
+        try {
+            const currentClient = this.clients.find(c => c.id == this.currentClient?.id);
+            if (currentClient) {
+                const opportunities = await this.apiCall(`opportunities&client_id=${currentClient.id}`);
+                currentClient.opportunities = opportunities;
+                this.renderOpportunitiesTab(currentClient);
+                
+                // Update the opportunities tab content
+                const opportunitiesTab = document.getElementById('opportunitiesTab');
+                if (opportunitiesTab) {
+                    opportunitiesTab.innerHTML = this.renderOpportunitiesTab(currentClient);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to refresh opportunities:', error);
+            this.showNotification('Failed to refresh opportunities', 'error');
+        }
+    }
+
+    async addOpportunityNote(opportunityId) {
+        try {
+            const modalHtml = `
+                <div class="modal" id="addOpportunityNoteModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Add Note to Opportunity</h2>
+                            <span class="close" onclick="crmApp.hideAddOpportunityNoteModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <form id="opportunityNoteForm" onsubmit="crmApp.submitOpportunityNote(event)">
+                                <input type="hidden" id="opportunityNoteId" name="opportunityId" value="${opportunityId}">
+                                
+                                <div class="form-group">
+                                    <label for="opportunityNoteText">Note</label>
+                                    <textarea id="opportunityNoteText" name="note_text" rows="4" required placeholder="Enter your note here..."></textarea>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">Add Note</button>
+                                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddOpportunityNoteModal()">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('addOpportunityNoteModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            document.getElementById('addOpportunityNoteModal').style.display = 'flex';
+        } catch (error) {
+            console.error('Failed to show add note modal:', error);
+            this.showNotification('Failed to show add note modal', 'error');
+        }
+    }
+
+    async addOpportunityAttachment(opportunityId) {
+        try {
+            const modalHtml = `
+                <div class="modal" id="addOpportunityAttachmentModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Add Attachment to Opportunity</h2>
+                            <span class="close" onclick="crmApp.hideAddOpportunityAttachmentModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <form id="opportunityAttachmentForm" onsubmit="crmApp.submitOpportunityAttachment(event)">
+                                <input type="hidden" id="opportunityAttachmentId" name="opportunityId" value="${opportunityId}">
+                                
+                                <div class="form-group">
+                                    <label for="opportunityAttachmentFile">File</label>
+                                    <input type="file" id="opportunityAttachmentFile" name="file" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="opportunityAttachmentTitle">Title</label>
+                                    <input type="text" id="opportunityAttachmentTitle" name="title" required placeholder="Enter attachment title...">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="opportunityAttachmentDescription">Description</label>
+                                    <textarea id="opportunityAttachmentDescription" name="description" rows="3" placeholder="Enter attachment description..."></textarea>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">Upload Attachment</button>
+                                    <button type="button" class="btn btn-secondary" onclick="crmApp.hideAddOpportunityAttachmentModal()">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('addOpportunityAttachmentModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            document.getElementById('addOpportunityAttachmentModal').style.display = 'flex';
+        } catch (error) {
+            console.error('Failed to show add attachment modal:', error);
+            this.showNotification('Failed to show add attachment modal', 'error');
+        }
+    }
+
+    hideAddOpportunityNoteModal() {
+        const modal = document.getElementById('addOpportunityNoteModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    hideAddOpportunityAttachmentModal() {
+        const modal = document.getElementById('addOpportunityAttachmentModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    async submitOpportunityNote(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const opportunityId = formData.get('opportunityId');
+        const noteText = formData.get('note_text');
+        
+        if (!noteText.trim()) {
+            this.showNotification('Please enter a note', 'error');
+            return;
+        }
+        
+        try {
+            const response = await this.apiCall(`opportunity-notes`, 'POST', {
+                opportunity_id: opportunityId,
+                note_text: noteText
+            });
+            
+            this.showNotification('Note added successfully', 'success');
+            this.hideAddOpportunityNoteModal();
+            
+            // Refresh the notes list by fetching the latest notes
+            const notes = await this.apiCall(`opportunity-notes&opportunity_id=${opportunityId}`);
+            
+            // Update the notes section in the modal
+            const notesContainer = document.querySelector('.notes-list');
+            if (notesContainer) {
+                if (notes && notes.length > 0) {
+                    // Clear existing notes and add all notes including the new one
+                    notesContainer.innerHTML = notes.map(note => `
+                        <div class="note-item">
+                            <div class="note-header">
+                                <div class="note-user">
+                                    <span class="user-avatar">${note.user_name ? note.user_name.charAt(0).toUpperCase() : 'U'}</span>
+                                    <span class="user-name">${note.user_name || 'Unknown User'}</span>
+                                </div>
+                                <span class="note-time">${this.formatDate(note.created_at)}</span>
+                            </div>
+                            <div class="note-content">
+                                <p>${note.note_text}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    notesContainer.innerHTML = '<div class="no-notes">No notes yet. Add the first note!</div>';
+                }
+            }
+            
+            // Update the notes count in the stats section
+            const notesCountStat = document.querySelector('.stat-item:nth-child(2) .stat-value');
+            if (notesCountStat) {
+                notesCountStat.textContent = notes ? notes.length : 0;
+            }
+            
+        } catch (error) {
+            console.error('Failed to add note:', error);
+            this.showNotification('Failed to add note: ' + error.message, 'error');
+        }
+    }
+
+    async submitOpportunityAttachment(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const opportunityId = formData.get('opportunityId');
+        const file = document.getElementById('opportunityAttachmentFile').files[0];
+        const title = formData.get('title');
+        const description = formData.get('description');
+        
+        if (!file) {
+            this.showNotification('Please select a file', 'error');
+            return;
+        }
+        
+        if (!title.trim()) {
+            this.showNotification('Please enter a title', 'error');
+            return;
+        }
+        
+        try {
+            const attachmentData = new FormData();
+            attachmentData.append('opportunity_id', opportunityId);
+            attachmentData.append('file', file);
+            attachmentData.append('title', title);
+            attachmentData.append('description', description || '');
+            
+            const response = await this.apiCallFormData(`opportunity-attachments`, 'POST', attachmentData);
+            
+            this.showNotification('Attachment uploaded successfully', 'success');
+            this.hideAddOpportunityAttachmentModal();
+            
+            // Refresh the attachments list by fetching the latest attachments
+            const attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
+            
+            // Update the attachments list in the modal
+            const attachmentsContainer = document.querySelector('.attachments-list');
+            if (attachmentsContainer) {
+                if (attachments && attachments.length > 0) {
+                    attachmentsContainer.innerHTML = attachments.map(attachment => `
+                        <div class="attachment-item">
+                            <div class="attachment-header">
+                                <div class="attachment-icon">
+                                    <i class="fas fa-file"></i>
+                                </div>
+                                <div class="attachment-info">
+                                    <div class="attachment-title">${attachment.title}</div>
+                                    <div class="attachment-meta">
+                                        <span class="attachment-size">${this.formatFileSize(attachment.filesize)}</span>
+                                        <span class="attachment-date">${this.formatDate(attachment.created_at)}</span>
+                                        <span class="attachment-user">by ${attachment.user_name || 'Unknown User'}</span>
+                                    </div>
+                                </div>
+                                <div class="attachment-actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="crmApp.downloadOpportunityAttachment('${attachment.filename}')" title="Download">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="crmApp.deleteOpportunityAttachment(${opportunityId}, ${attachment.id})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            ${attachment.description ? `
+                                <div class="attachment-description">
+                                    <p>${attachment.description}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    attachmentsContainer.innerHTML = '<div class="no-attachments">No attachments yet. Add the first attachment!</div>';
+                }
+            }
+            
+            // Update the attachments count in the stats section
+            const attachmentsStat = document.querySelector('.stat-item:last-child .stat-value');
+            if (attachmentsStat) {
+                attachmentsStat.textContent = attachments ? attachments.length : 0;
+            }
+            
+        } catch (error) {
+            console.error('Failed to upload attachment:', error);
+            this.showNotification('Failed to upload attachment: ' + error.message, 'error');
+        }
+    }
+
+    async downloadOpportunityAttachment(filename) {
+        try {
+            const response = await fetch(`uploads/${filename}`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to download file');
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            this.showNotification('Download started', 'success');
+        } catch (error) {
+            console.error('Failed to download attachment:', error);
+            this.showNotification('Failed to download attachment: ' + error.message, 'error');
+        }
+    }
+
+    async deleteOpportunityAttachment(opportunityId, attachmentId) {
+        if (!confirm('Are you sure you want to delete this attachment?')) {
+            return;
+        }
+        
+        try {
+            await this.apiCall(`opportunity-attachments&id=${attachmentId}`, 'DELETE');
+            
+            this.showNotification('Attachment deleted successfully', 'success');
+            
+            // Refresh the opportunity view to update the attachments list
+            const currentOpportunity = await this.apiCall(`opportunities&id=${opportunityId}`);
+            if (currentOpportunity) {
+                // Refresh the attachments list
+                const attachments = await this.apiCall(`opportunity-attachments&opportunity_id=${opportunityId}`);
+                
+                // Update the attachments list in the modal
+                const attachmentsContainer = document.querySelector('.attachments-list');
+                if (attachmentsContainer) {
+                    if (attachments && attachments.length > 0) {
+                        attachmentsContainer.innerHTML = attachments.map(attachment => `
+                            <div class="attachment-item">
+                                <div class="attachment-header">
+                                    <div class="attachment-icon">
+                                        <i class="fas fa-file"></i>
+                                    </div>
+                                    <div class="attachment-info">
+                                        <div class="attachment-title">${attachment.title}</div>
+                                        <div class="attachment-meta">
+                                            <span class="attachment-size">${this.formatFileSize(attachment.filesize)}</span>
+                                            <span class="attachment-date">${this.formatDate(attachment.created_at)}</span>
+                                            <span class="attachment-user">by ${attachment.user_name || 'Unknown User'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="attachment-actions">
+                                        <button class="btn btn-sm btn-secondary" onclick="crmApp.downloadOpportunityAttachment('${attachment.filename}')" title="Download">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="crmApp.deleteOpportunityAttachment(${opportunityId}, ${attachment.id})" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                ${attachment.description ? `
+                                    <div class="attachment-description">
+                                        <p>${attachment.description}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        attachmentsContainer.innerHTML = '<div class="no-attachments">No attachments yet. Add the first attachment!</div>';
+                    }
+                }
+                
+                // Update the attachments count in the stats section
+                const attachmentsStat = document.querySelector('.stat-item:last-child .stat-value');
+                if (attachmentsStat) {
+                    attachmentsStat.textContent = attachments ? attachments.length : 0;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to delete attachment:', error);
+            this.showNotification('Failed to delete attachment: ' + error.message, 'error');
+        }
+    }
 }
 
 const crmApp = new CRMApp();
@@ -2489,4 +4547,32 @@ function goToKanban() {
 function testEditClient(clientId = 1) {
     console.log('Testing edit client with ID:', clientId);
     crmApp.editClient(clientId);
-} 
+}
+
+function hideAddOpportunityModal() {
+    crmApp.hideAddOpportunityModal();
+}
+
+function hideViewOpportunityModal() {
+    crmApp.hideViewOpportunityModal();
+}
+
+function submitOpportunity(event) {
+    crmApp.submitOpportunity(event);
+}
+
+function hideAddOpportunityNoteModal() {
+    crmApp.hideAddOpportunityNoteModal();
+}
+
+function hideAddOpportunityAttachmentModal() {
+    crmApp.hideAddOpportunityAttachmentModal();
+}
+
+function submitOpportunityNote(event) {
+    crmApp.submitOpportunityNote(event);
+}
+
+function submitOpportunityAttachment(event) {
+    crmApp.submitOpportunityAttachment(event);
+}

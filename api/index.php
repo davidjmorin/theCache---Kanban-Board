@@ -411,8 +411,26 @@ function handleTasks($pdo, $method, $id) {
 function handleUsers($pdo, $method, $id) {
     switch ($method) {
         case 'GET':
-            $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
-            sendResponse($stmt->fetchAll());
+            $userId = $_SESSION['user_id'];
+            $isAdmin = $_SESSION['is_admin'] ?? false;
+            
+            if ($isAdmin) {
+                $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
+                sendResponse($stmt->fetchAll());
+            } else {
+                // Get users who are part of boards the current user has access to
+                $stmt = $pdo->prepare("
+                    SELECT DISTINCT u.* 
+                    FROM users u
+                    LEFT JOIN tasks t ON u.id = t.user_id OR u.id = t.created_by
+                    LEFT JOIN boards b ON t.board_id = b.id
+                    LEFT JOIN board_shares bs ON b.id = bs.board_id
+                    WHERE (b.created_by = ? OR bs.user_id = ? OR b.created_by IS NULL OR u.id = ?)
+                    ORDER BY u.name
+                ");
+                $stmt->execute([$userId, $userId, $userId]);
+                sendResponse($stmt->fetchAll());
+            }
             break;
         case 'POST':
             $data = getRequestBody();
@@ -462,19 +480,50 @@ function handleUsers($pdo, $method, $id) {
 function handleClients($pdo, $method, $id) {
     switch ($method) {
         case 'GET':
+            $userId = $_SESSION['user_id'];
+            $isAdmin = $_SESSION['is_admin'] ?? false;
+            
             if ($id) {
-
-                $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
-                $stmt->execute([$id]);
-                $client = $stmt->fetch();
-                if (!$client) {
-                    sendResponse(['error' => 'Client not found'], 404);
+                // For individual client, check if user has access
+                if ($isAdmin) {
+                    $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
+                    $stmt->execute([$id]);
+                    $client = $stmt->fetch();
+                    if (!$client) {
+                        sendResponse(['error' => 'Client not found'], 404);
+                    }
+                    sendResponse($client);
+                } else {
+                    // Check if client is associated with user's tasks
+                    $stmt = $pdo->prepare("
+                        SELECT DISTINCT c.* 
+                        FROM clients c
+                        INNER JOIN tasks t ON c.id = t.client_id
+                        WHERE c.id = ? AND (t.created_by = ? OR t.user_id = ?)
+                    ");
+                    $stmt->execute([$id, $userId, $userId]);
+                    $client = $stmt->fetch();
+                    if (!$client) {
+                        sendResponse(['error' => 'Client not found'], 404);
+                    }
+                    sendResponse($client);
                 }
-                sendResponse($client);
             } else {
-
-                $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
-                sendResponse($stmt->fetchAll());
+                if ($isAdmin) {
+                    $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
+                    sendResponse($stmt->fetchAll());
+                } else {
+                    // Get clients associated with tasks the current user has access to
+                    $stmt = $pdo->prepare("
+                        SELECT DISTINCT c.* 
+                        FROM clients c
+                        INNER JOIN tasks t ON c.id = t.client_id
+                        WHERE t.created_by = ? OR t.user_id = ?
+                        ORDER BY c.name
+                    ");
+                    $stmt->execute([$userId, $userId]);
+                    sendResponse($stmt->fetchAll());
+                }
             }
             break;
         case 'POST':
@@ -896,11 +945,41 @@ function handleBoard($pdo, $method) {
         }
         $tasks = $stmt->fetchAll();
 
-        $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
-        $users = $stmt->fetchAll();
+        // Filter users based on current user's access
+        if ($isAdmin) {
+            $stmt = $pdo->query("SELECT * FROM users ORDER BY name");
+            $users = $stmt->fetchAll();
+        } else {
+            // Get users who are part of boards the current user has access to
+            $stmt = $pdo->prepare("
+                SELECT DISTINCT u.* 
+                FROM users u
+                LEFT JOIN tasks t ON u.id = t.user_id OR u.id = t.created_by
+                LEFT JOIN boards b ON t.board_id = b.id
+                LEFT JOIN board_shares bs ON b.id = bs.board_id
+                WHERE (b.created_by = ? OR bs.user_id = ? OR b.created_by IS NULL OR u.id = ?)
+                ORDER BY u.name
+            ");
+            $stmt->execute([$userId, $userId, $userId]);
+            $users = $stmt->fetchAll();
+        }
 
-        $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
-        $clients = $stmt->fetchAll();
+        // Filter clients based on current user's access
+        if ($isAdmin) {
+            $stmt = $pdo->query("SELECT * FROM clients ORDER BY name");
+            $clients = $stmt->fetchAll();
+        } else {
+            // Get clients associated with tasks the current user has access to
+            $stmt = $pdo->prepare("
+                SELECT DISTINCT c.* 
+                FROM clients c
+                INNER JOIN tasks t ON c.id = t.client_id
+                WHERE t.created_by = ? OR t.user_id = ?
+                ORDER BY c.name
+            ");
+            $stmt->execute([$userId, $userId]);
+            $clients = $stmt->fetchAll();
+        }
 
         sendResponse([
             'company' => $company,

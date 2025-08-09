@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Features Test - The Cache</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .test-section {
+            background: var(--card-background);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+        
+        .test-section h2 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--hover-color);
+        }
+        
+        .company-search-results {
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-background);
+        }
+        
+        .company-result {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .company-result:hover {
+            background: var(--hover-color);
+        }
+        
+        .company-result:last-child {
+            border-bottom: none;
+        }
+        
+        .company-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .company-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        .error {
+            color: var(--danger-color);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        
+        .success {
+            color: var(--success-color);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        
+        .google-places-container {
+            position: relative;
+        }
+        
+        .pac-container {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: var(--shadow);
+        }
+        
+        .pac-item {
+            padding: 0.75rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .pac-item:hover {
+            background: var(--hover-color);
+        }
+        
+        .pac-item-selected {
+            background: var(--primary-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 style="color: var(--primary-color); margin-bottom: 2rem;">CRM Features Test Page</h1>
+        
+        <!-- Google Places Autocomplete Test -->
+        <div class="test-section">
+            <h2><i class="fas fa-map-marker-alt"></i> Google Places Autocomplete Test</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Test the Google Places Autocomplete feature for address fields.
+            </p>
+            
+            <form id="addressForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="streetAddress">Street Address *</label>
+                        <div class="google-places-container">
+                            <input type="text" id="streetAddress" name="streetAddress" placeholder="Start typing an address..." required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" id="city" name="city" readonly>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="state">State/Province</label>
+                        <input type="text" id="state" name="state" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="postalCode">Postal Code</label>
+                        <input type="text" id="postalCode" name="postalCode" readonly>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="country">Country</label>
+                        <input type="text" id="country" name="country" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone</label>
+                        <input type="tel" id="phone" name="phone" placeholder="Phone number">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="formattedAddress">Formatted Address</label>
+                    <textarea id="formattedAddress" name="formattedAddress" rows="3" readonly></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Address
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearAddressForm()">
+                        <i class="fas fa-undo"></i> Clear Form
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Company Lookup Test -->
+        <div class="test-section">
+            <h2><i class="fas fa-building"></i> Google Places Company Lookup Test</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Search for real company information using Google Places API. Only returns real business data - no mock results.
+            </p>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="companySearch">Search Company</label>
+                    <input type="text" id="companySearch" placeholder="Enter company name or phone number">
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn btn-primary" onclick="searchCompany()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+            
+            <div id="companySearchResults" class="company-search-results" style="display: none;"></div>
+            
+            <div id="companyForm" style="display: none;">
+                <h3 style="margin-top: 2rem; color: var(--primary-color);">Company Information</h3>
+                <form id="companyDetailsForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="companyName">Company Name</label>
+                            <input type="text" id="companyName" name="companyName">
+                        </div>
+                        <div class="form-group">
+                            <label for="companyPhone">Phone</label>
+                            <input type="tel" id="companyPhone" name="companyPhone">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="companyEmail">Email</label>
+                            <input type="email" id="companyEmail" name="companyEmail">
+                        </div>
+                        <div class="form-group">
+                            <label for="companyWebsite">Website</label>
+                            <input type="url" id="companyWebsite" name="companyWebsite">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="companyDescription">Description</label>
+                        <textarea id="companyDescription" name="companyDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Company
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearCompanyForm()">
+                            <i class="fas fa-undo"></i> Clear Form
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- API Key Configuration -->
+        <div class="test-section">
+            <h2><i class="fas fa-key"></i> API Configuration</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Configure your Google API key for Places Autocomplete.
+            </p>
+            
+            <div class="form-group">
+                <label for="googleApiKey">Google API Key</label>
+                <input type="text" id="googleApiKey" placeholder="Enter your Google API key">
+                <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                    Make sure your API key has Places API enabled.
+                </small>
+            </div>
+            
+            <button type="button" class="btn btn-primary" onclick="saveApiKey()">
+                <i class="fas fa-save"></i> Save API Key
+            </button>
+        </div>
+    </div>
+
+    <!-- Google Places API Script -->
+    <script>
+        let autocomplete;
+        let place;
+        let googleApiKey = localStorage.getItem('googleApiKey') || '';
+        let companySearchResults = []; // Store search results globally
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('googleApiKey').value = googleApiKey;
+            if (googleApiKey) {
+                loadGooglePlacesAPI();
+            }
+        });
+        
+        function saveApiKey() {
+            const apiKey = document.getElementById('googleApiKey').value.trim();
+            if (apiKey) {
+                localStorage.setItem('googleApiKey', apiKey);
+                googleApiKey = apiKey;
+                loadGooglePlacesAPI();
+                showMessage('API key saved successfully!', 'success');
+            } else {
+                showMessage('Please enter a valid API key.', 'error');
+            }
+        }
+        
+        function loadGooglePlacesAPI() {
+            if (!googleApiKey) {
+                showMessage('Please enter your Google API key first.', 'error');
+                return;
+            }
+            
+            // Load Google Places API
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places&callback=initAutocomplete`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+        
+        function initAutocomplete() {
+            const input = document.getElementById('streetAddress');
+            autocomplete = new google.maps.places.Autocomplete(input, {
+                types: ['address'],
+                componentRestrictions: { country: ['us', 'ca'] } // Restrict to US and Canada
+            });
+            
+            autocomplete.addListener('place_changed', function() {
+                place = autocomplete.getPlace();
+                fillAddressFields(place);
+            });
+            
+            showMessage('Google Places Autocomplete loaded successfully!', 'success');
+        }
+        
+        function fillAddressFields(place) {
+            // Clear previous values
+            document.getElementById('city').value = '';
+            document.getElementById('state').value = '';
+            document.getElementById('postalCode').value = '';
+            document.getElementById('country').value = '';
+            document.getElementById('formattedAddress').value = '';
+            
+            if (!place.geometry) {
+                showMessage('No address details available for this place.', 'error');
+                return;
+            }
+            
+            // Fill in the address components
+            for (const component of place.address_components) {
+                const type = component.types[0];
+                
+                switch (type) {
+                    case 'locality':
+                        document.getElementById('city').value = component.long_name;
+                        break;
+                    case 'administrative_area_level_1':
+                        document.getElementById('state').value = component.long_name;
+                        break;
+                    case 'postal_code':
+                        document.getElementById('postalCode').value = component.long_name;
+                        break;
+                    case 'country':
+                        document.getElementById('country').value = component.long_name;
+                        break;
+                }
+            }
+            
+            // Set formatted address
+            document.getElementById('formattedAddress').value = place.formatted_address;
+            
+            // Try to extract phone number if available
+            if (place.formatted_phone_number) {
+                document.getElementById('phone').value = place.formatted_phone_number;
+            }
+            
+            showMessage('Address fields filled successfully!', 'success');
+        }
+        
+        async function searchCompany() {
+            const searchTerm = document.getElementById('companySearch').value.trim();
+            if (!searchTerm) {
+                showMessage('Please enter a company name or phone number to search.', 'error');
+                return;
+            }
+            
+            const resultsContainer = document.getElementById('companySearchResults');
+            resultsContainer.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            resultsContainer.style.display = 'block';
+            
+            try {
+                // Call the real API endpoint
+                const response = await fetch(`api.php?endpoint=company-lookup&q=${encodeURIComponent(searchTerm)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                companySearchResults = data.results || []; // Store results globally
+                displayCompanyResults(companySearchResults);
+            } catch (error) {
+                showMessage('Error searching for company: ' + error.message, 'error');
+                resultsContainer.style.display = 'none';
+            }
+        }
+        
+        function simulateCompanySearch(searchTerm) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    // Simulate search results
+                    const results = [
+                        {
+                            name: searchTerm + ' Inc.',
+                            phone: '+1-555-123-4567',
+                            email: 'contact@' + searchTerm.toLowerCase().replace(/\s+/g, '') + '.com',
+                            website: 'https://www.' + searchTerm.toLowerCase().replace(/\s+/g, '') + '.com',
+                            description: 'Leading provider of innovative solutions.',
+                            address: '123 Business St, City, State 12345'
+                        },
+                        {
+                            name: searchTerm + ' Corporation',
+                            phone: '+1-555-987-6543',
+                            email: 'info@' + searchTerm.toLowerCase().replace(/\s+/g, '') + 'corp.com',
+                            website: 'https://www.' + searchTerm.toLowerCase().replace(/\s+/g, '') + 'corp.com',
+                            description: 'Global technology company specializing in enterprise solutions.',
+                            address: '456 Corporate Ave, City, State 12345'
+                        }
+                    ];
+                    resolve(results);
+                }, 1500);
+            });
+        }
+        
+        function displayCompanyResults(results) {
+            const container = document.getElementById('companySearchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="loading">No companies found.</div>';
+                return;
+            }
+            
+            container.innerHTML = results.map((company, index) => `
+                <div class="company-result" onclick="selectCompany(${index})">
+                    <div class="company-name">
+                        ${company.name}
+                        ${company.confidence ? `<span style="color: var(--success-color); font-size: 0.75rem; margin-left: 0.5rem;">(${Math.round(company.confidence * 100)}% match)</span>` : ''}
+                        ${company.source ? `<span style="color: var(--info-color); font-size: 0.75rem; margin-left: 0.5rem;">[${company.source}]</span>` : ''}
+                        ${company.rating ? `<span style="color: var(--warning-color); font-size: 0.75rem; margin-left: 0.5rem;">⭐ ${company.rating}/5</span>` : ''}
+                    </div>
+                    <div class="company-details">
+                        <div><i class="fas fa-phone"></i> ${company.phone || 'N/A'}</div>
+                        <div><i class="fas fa-envelope"></i> ${company.email || 'N/A'}</div>
+                        <div><i class="fas fa-globe"></i> ${company.website || 'N/A'}</div>
+                        <div><i class="fas fa-map-marker-alt"></i> ${company.address || 'N/A'}</div>
+                        ${company.description ? `<div><i class="fas fa-info-circle"></i> ${company.description}</div>` : ''}
+                        ${company.company_number ? `<div><i class="fas fa-id-card"></i> Company #: ${company.company_number}</div>` : ''}
+                        ${company.incorporation_date ? `<div><i class="fas fa-calendar"></i> Incorporated: ${company.incorporation_date}</div>` : ''}
+                        ${company.user_ratings_total ? `<div><i class="fas fa-users"></i> ${company.user_ratings_total} reviews</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function selectCompany(index) {
+            // In real implementation, this would get the actual selected company data
+            const company = companySearchResults[index];
+            
+            fillCompanyForm(company);
+            document.getElementById('companySearchResults').style.display = 'none';
+        }
+        
+        function fillCompanyForm(company) {
+            document.getElementById('companyName').value = company.name;
+            document.getElementById('companyPhone').value = company.phone;
+            document.getElementById('companyEmail').value = company.email;
+            document.getElementById('companyWebsite').value = company.website;
+            document.getElementById('companyDescription').value = company.description;
+            
+            document.getElementById('companyForm').style.display = 'block';
+            showMessage('Company information filled successfully!', 'success');
+        }
+        
+        function clearAddressForm() {
+            document.getElementById('addressForm').reset();
+            showMessage('Address form cleared.', 'success');
+        }
+        
+        function clearCompanyForm() {
+            document.getElementById('companyDetailsForm').reset();
+            document.getElementById('companyForm').style.display = 'none';
+            document.getElementById('companySearchResults').style.display = 'none';
+            showMessage('Company form cleared.', 'success');
+        }
+        
+        function showMessage(message, type) {
+            // Create a temporary message element
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            messageDiv.style.position = 'fixed';
+            messageDiv.style.top = '20px';
+            messageDiv.style.right = '20px';
+            messageDiv.style.padding = '1rem';
+            messageDiv.style.borderRadius = '6px';
+            messageDiv.style.zIndex = '1000';
+            messageDiv.style.background = type === 'success' ? 'var(--success-color)' : 'var(--danger-color)';
+            messageDiv.style.color = 'white';
+            
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+        
+        // Form submission handlers
+        document.getElementById('addressForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showMessage('Address saved successfully! (Test mode)', 'success');
+        });
+        
+        document.getElementById('companyDetailsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showMessage('Company saved successfully! (Test mode)', 'success');
+        });
+    </script>
+</body>
+</html>

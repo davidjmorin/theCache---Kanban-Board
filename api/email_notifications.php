@@ -111,6 +111,13 @@ class EmailNotifications {
      * Send email using Brevo API
      */
     private function sendEmailViaBrevo($to, $subject, $message) {
+        return $this->sendEmailViaBrevoPublic($to, $subject, $message);
+    }
+    
+    /**
+     * Public method to send email via Brevo
+     */
+    public function sendEmailViaBrevoPublic($to, $subject, $message) {
         $data = [
             'sender' => [
                 'name' => 'Kanban Board',

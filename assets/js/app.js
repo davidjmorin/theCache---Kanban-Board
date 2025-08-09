@@ -226,10 +226,9 @@ class KanbanApp {
 
             this.currentUser = response.user;
             this.csrfToken = response.csrf_token;
-            this.showApp();
-            await this.loadBoardData();
-            this.checkDueTasks();
-            this.showNotification('Login successful!', 'success');
+            
+            // Redirect to dashboard after successful login
+            window.location.href = '/';
         } catch (error) {
             this.showNotification('Login failed: ' + error.message, 'error');
         } finally {
@@ -251,12 +250,13 @@ class KanbanApp {
 
             this.currentUser = response.user;
             this.csrfToken = response.csrf_token;
+            
+            // Show success message and redirect to main app
+            this.showNotification('Registration successful! Welcome to The Cache.', 'success');
             this.showApp();
-            await this.loadBoardData();
-            this.checkDueTasks();
-            this.showNotification('Registration successful!', 'success');
         } catch (error) {
-            this.showNotification('Registration failed: ' + error.message, 'error');
+            console.error('Registration error:', error);
+            this.showNotification('Registration failed: ' + (error.message || 'Unknown error'), 'error');
         } finally {
             this.hideLoading();
         }
@@ -349,10 +349,11 @@ class KanbanApp {
                 return;
             }
 
-            const [companyData, boardsData, boardData, usersData, clientsData] = await Promise.all([
+            const [companyData, boardsData, boardData, tasksData, usersData, clientsData] = await Promise.all([
                 this.apiCall('company'),
                 this.apiCall('boards'),
                 this.apiCall('board', 'GET', null, { board_id: this.data.currentBoard.id }),
+                this.apiCall('tasks'), // Load all tasks for the user
                 this.apiCall('users'),
                 this.apiCall('clients')
             ]);
@@ -361,7 +362,7 @@ class KanbanApp {
             this.data.boards = boardsData || [];
             this.data.board = boardData.board;
             this.data.stages = boardData.stages || [];
-            this.data.tasks = boardData.tasks || [];
+            this.data.tasks = tasksData || []; // Use all tasks instead of just board tasks
             this.data.users = usersData || [];
             this.data.clients = clientsData || [];
 
@@ -474,7 +475,11 @@ class KanbanApp {
     }
 
     createStageElement(stage) {
-        const stageTasks = this.data.tasks.filter(task => task.stage_id == stage.id);
+        const stageTasks = this.data.tasks.filter(task => 
+            task.stage_id == stage.id && 
+            task.board_id == this.data.currentBoard.id
+        );
+        const activeTasks = stageTasks.filter(task => task.is_completed != 1);
         const completedTasks = stageTasks.filter(task => task.is_completed == 1);
         const totalTasks = stageTasks.length;
         const completedCount = completedTasks.length;
@@ -492,7 +497,7 @@ class KanbanApp {
                     <span class="stage-color" style="background: ${stage.color}"></span>
                     ${stage.name}
                     <span class="stage-count">${totalTasks}</span>
-                    ${completedCount > 0 ? `<span class="stage-completed-count">${completedCount} done</span>` : ''}
+                    ${completedCount > 0 ? `<span class="stage-completed-count">${completedCount} </span>` : ''}
                 </div>
                 <div class="stage-actions">
                     <button class="btn-icon" onclick="app.addTaskToStage(${stage.id})" title="Add Task to ${stage.name}">
@@ -504,8 +509,19 @@ class KanbanApp {
                 </div>
             </div>
             <div class="tasks-container" ondrop="app.handleDrop(event)" ondragover="app.handleDragOver(event)">
-                ${stageTasks.map(task => this.createTaskElement(task)).join('')}
+                ${activeTasks.map(task => this.createTaskElement(task)).join('')}
             </div>
+            ${completedCount > 0 ? `
+                <div class="completed-tasks-section">
+                    <div class="completed-tasks-header" onclick="app.toggleCompletedTasks(${stage.id})">
+                        <i class="fas fa-chevron-down"></i>
+                        <span>Completed (${completedCount})</span>
+                    </div>
+                    <div class="completed-tasks-container" id="completed-${stage.id}" style="display: none;">
+                        ${completedTasks.map(task => this.createTaskElement(task)).join('')}
+                    </div>
+                </div>
+            ` : ''}
         `;
 
         stageDiv.ondragover = (e) => this.handleStageDragOver(e);
@@ -882,7 +898,6 @@ class KanbanApp {
     }
 
     populateSelectOptions() {
-
         const userSelect = document.getElementById('taskAssignee');
         if (userSelect) {
             userSelect.innerHTML = '<option value="">Unassigned</option>';
@@ -911,15 +926,22 @@ class KanbanApp {
             }
         }
 
+        // Don't populate stages and boards here - they will be populated dynamically
+        // Only clear them if they exist but don't have any options yet
         const stageSelect = document.getElementById('taskStage');
-        if (stageSelect) {
+        if (stageSelect && stageSelect.children.length === 0) {
             stageSelect.innerHTML = '<option value="">Select Stage</option>';
-            if (this.data.stages && this.data.stages.length > 0) {
-                this.data.stages.forEach(stage => {
+        }
+
+        const boardSelect = document.getElementById('taskBoard');
+        if (boardSelect) {
+            boardSelect.innerHTML = '<option value="">Select Board</option>';
+            if (this.data.boards && this.data.boards.length > 0) {
+                this.data.boards.forEach(board => {
                     const option = document.createElement('option');
-                    option.value = stage.id;
-                    option.textContent = stage.name;
-                    stageSelect.appendChild(option);
+                    option.value = board.id;
+                    option.textContent = board.name;
+                    boardSelect.appendChild(option);
                 });
             }
         }
@@ -980,6 +1002,17 @@ class KanbanApp {
             e.preventDefault();
             const taskId = document.getElementById('taskId').value;
             this.showNoteEditorModal(taskId || 'new');
+        });
+
+        document.getElementById('addDetailedNoteBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const taskId = document.getElementById('taskId').value;
+            if (taskId && taskId !== 'new') {
+                // Open notes.html with the task pre-selected
+                window.open(`notes.html?task=${taskId}`, '_blank');
+            } else {
+                this.showNotification('Please save the task first before creating a detailed note', 'info');
+            }
         });
 
         document.getElementById('editDescriptionBtn').addEventListener('click', (e) => {
@@ -1090,6 +1123,18 @@ class KanbanApp {
                 }
             }
         });
+
+        // Add event listener for board selection to load stages
+        const boardSelect = document.getElementById('taskBoard');
+        if (boardSelect) {
+            boardSelect.addEventListener('change', (e) => this.handleBoardChange(e));
+        }
+        
+        // Add event listener for user selection to load boards
+        const userSelect = document.getElementById('taskAssignee');
+        if (userSelect) {
+            userSelect.addEventListener('change', (e) => this.handleUserChange(e));
+        }
     }
 
     setupDropdowns() {
@@ -1151,6 +1196,18 @@ class KanbanApp {
 
         if (modalId === 'taskModal') {
             this.clearTaskModal();
+            
+            // Remove event listeners to prevent duplicates
+            const boardSelect = document.getElementById('taskBoard');
+            const userSelect = document.getElementById('taskAssignee');
+            
+            if (boardSelect) {
+                boardSelect.removeAttribute('data-listener-attached');
+            }
+            
+            if (userSelect) {
+                userSelect.removeAttribute('data-listener-attached');
+            }
         }
     }
 
@@ -1174,6 +1231,17 @@ class KanbanApp {
         const callRadio = document.querySelector('input[name="noteType"][value="call"]');
         if (callRadio) {
             callRadio.checked = true;
+        }
+        
+        // Clear board and stage selections
+        const boardSelect = document.getElementById('taskBoard');
+        if (boardSelect) {
+            boardSelect.innerHTML = '<option value="">Select Board</option>';
+        }
+        
+        const stageSelect = document.getElementById('taskStage');
+        if (stageSelect) {
+            stageSelect.innerHTML = '<option value="">Select Stage</option>';
         }
         
         // Set client if we have a pending client ID from URL
@@ -1312,7 +1380,6 @@ class KanbanApp {
 
         this.populateSelectOptions();
 
-        // Set stage if we have a pending stage ID
         if (this.pendingStageId) {
             const stageSelect = document.getElementById('taskStage');
             if (stageSelect) {
@@ -1323,6 +1390,27 @@ class KanbanApp {
         }
 
         this.showModal('taskModal');
+        
+        // For new tasks, ensure the color field is set to default
+        if (!taskId) {
+            const colorInput = document.getElementById('taskCardColor');
+            if (colorInput) {
+                colorInput.value = '#1a202c';
+            }
+        }
+        
+        const boardSelect = document.getElementById('taskBoard');
+        const userSelect = document.getElementById('taskAssignee');
+        
+        if (boardSelect && !boardSelect.hasAttribute('data-listener-attached')) {
+            boardSelect.addEventListener('change', (e) => this.handleBoardChange(e));
+            boardSelect.setAttribute('data-listener-attached', 'true');
+        }
+        
+        if (userSelect && !userSelect.hasAttribute('data-listener-attached')) {
+            userSelect.addEventListener('change', (e) => this.handleUserChange(e));
+            userSelect.setAttribute('data-listener-attached', 'true');
+        }
     }
 
     showQuickAddModal() {
@@ -1443,7 +1531,12 @@ class KanbanApp {
                 displayContent.innerHTML = this.renderMarkdown(task.description || '');
             }
 
+            // First populate the dropdowns with all options
+            this.populateSelectOptions();
+
+            // Then set the specific values for this task
             document.getElementById('taskStage').value = task.stage_id;
+            document.getElementById('taskBoard').value = task.board_id || '';
             document.getElementById('taskAssignee').value = task.user_id || '';
             document.getElementById('taskClient').value = task.client_id || '';
             document.getElementById('taskStartDate').value = task.start_date || '';
@@ -1451,6 +1544,27 @@ class KanbanApp {
             document.getElementById('taskDueTime').value = task.due_time || '';
             document.getElementById('taskCardColor').value = task.card_color || '#1a202c';
             document.getElementById('taskPriority').value = task.priority || 'medium';
+
+            // If the task has a board_id, populate the stages for that board
+            if (task.board_id) {
+                try {
+                    const stages = await this.apiCall(`stages&board_id=${task.board_id}`);
+                    const stageSelect = document.getElementById('taskStage');
+                    if (stageSelect && stages && stages.length > 0) {
+                        stageSelect.innerHTML = '<option value="">Select Stage</option>';
+                        stages.forEach(stage => {
+                            const option = document.createElement('option');
+                            option.value = stage.id;
+                            option.textContent = stage.name;
+                            stageSelect.appendChild(option);
+                        });
+                        // Set the stage value again after populating
+                        stageSelect.value = task.stage_id;
+                    }
+                } catch (error) {
+                    console.error('Error loading stages for task board:', error);
+                }
+            }
 
             await this.loadAttachments(taskId);
 
@@ -1531,12 +1645,33 @@ class KanbanApp {
 
         let description = formData.get('taskDescription');
 
+        // If editing a task, preserve original values if fields are empty
+        let boardId = formData.get('taskBoard');
+        let userId = formData.get('taskAssignee');
+        let stageId = formData.get('taskStage');
+
+        if (taskId) {
+            // When editing, if fields are empty, preserve the original values
+            if (!boardId) {
+                const boardSelect = document.getElementById('taskBoard');
+                boardId = boardSelect ? boardSelect.value : null;
+            }
+            if (!userId) {
+                const userSelect = document.getElementById('taskAssignee');
+                userId = userSelect ? userSelect.value : null;
+            }
+            if (!stageId) {
+                const stageSelect = document.getElementById('taskStage');
+                stageId = stageSelect ? stageSelect.value : null;
+            }
+        }
+
         const data = {
             title: formData.get('taskTitle'),
             description: description,
-            stage_id: formData.get('taskStage'),
-            board_id: this.data.currentBoard ? this.data.currentBoard.id : null,
-            user_id: formData.get('taskAssignee') || null,
+            stage_id: stageId,
+            board_id: boardId || (this.data.currentBoard ? this.data.currentBoard.id : null),
+            user_id: userId || null,
             client_id: formData.get('taskClient') || null,
             start_date: formData.get('taskStartDate') || null,
             due_date: formData.get('taskDueDate') || null,
@@ -2414,8 +2549,12 @@ class KanbanApp {
 
     async loadNotes(taskId) {
         try {
-            const notes = await this.apiCall(`notes&id=${taskId}`, 'GET');
+            const notes = await this.apiCall(`obsidian-notes&id=${taskId}`, 'GET');
             this.displayNotes(notes);
+            
+            // Load linked detailed notes
+            const linkedNotes = await this.apiCall(`notes`, 'GET', null, { task_id: taskId });
+            this.displayLinkedNotes(linkedNotes);
         } catch (error) {
             console.error('Failed to load notes:', error);
         }
@@ -2455,6 +2594,47 @@ class KanbanApp {
                 <div class="note-actions">
                     <button type="button" class="btn-icon" onclick="app.deleteNote(${note.id})" title="Delete Note">
                         <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    displayLinkedNotes(notes) {
+        const container = document.getElementById('linkedNotesList');
+        container.innerHTML = '';
+
+        if (!notes || notes.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 1rem;">No linked detailed notes</div>';
+            return;
+        }
+
+        notes.forEach(note => {
+            const div = document.createElement('div');
+            div.className = 'note-item linked-note-item';
+            const formattedTime = this.formatNoteTime(note.created_at);
+
+            div.innerHTML = `
+                <div class="note-content">
+                    <div class="note-header">
+                        <span class="note-time">${formattedTime}</span>
+                        <span class="note-type-badge note-type-detailed">
+                            <i class="fas fa-sticky-note"></i>
+                            Detailed Note
+                        </span>
+                    </div>
+                    <div class="note-text markdown-content">
+                        <strong>${note.title}</strong>
+                        ${note.content ? '<br>' + this.renderMarkdown(note.content.substring(0, 200) + (note.content.length > 200 ? '...' : '')) : ''}
+                    </div>
+                    <div class="note-footer">
+                        <span class="note-user">${note.user_name || 'Unknown'}</span>
+                    </div>
+                </div>
+                <div class="note-actions">
+                    <button type="button" class="btn-icon" onclick="window.open('notes.html?note=${note.id}', '_blank')" title="Open in Notes">
+                        <i class="fas fa-external-link-alt"></i>
                     </button>
                 </div>
             `;
@@ -2502,7 +2682,7 @@ class KanbanApp {
 
             console.log('Sending note data:', data);
 
-            await this.apiCall('notes', 'POST', data);
+            await this.apiCall('obsidian-notes', 'POST', data);
 
             if (this.notePopupEditor) {
                 this.notePopupEditor.value('');
@@ -2582,7 +2762,7 @@ class KanbanApp {
         }
 
         try {
-            await this.apiCall(`notes&id=${noteId}`, 'DELETE');
+            await this.apiCall(`obsidian-notes&id=${noteId}`, 'DELETE');
             this.showNotification('Note deleted successfully', 'success');
             const taskId = document.getElementById('taskId').value;
             if (taskId) {
@@ -3770,6 +3950,103 @@ class KanbanApp {
             await this.loadCurrentShares();
         } catch (error) {
             this.showNotification(`Failed to remove access: ` + error.message, 'error');
+        }
+    }
+
+    async handleBoardChange(event) {
+        const boardId = event.target.value;
+        const stageSelect = document.getElementById('taskStage');
+        
+        // Clear stages first
+        stageSelect.innerHTML = '<option value="">Select Stage</option>';
+        
+        if (!boardId) {
+            return;
+        }
+        
+        try {
+            const stages = await this.apiCall(`stages&board_id=${boardId}`);
+            
+            if (stages && stages.length > 0) {
+                stages.forEach(stage => {
+                    // Check if option already exists
+                    const existingOption = stageSelect.querySelector(`option[value="${stage.id}"]`);
+                    if (!existingOption) {
+                        const option = document.createElement('option');
+                        option.value = stage.id;
+                        option.textContent = stage.name;
+                        stageSelect.appendChild(option);
+                    }
+                });
+            } else {
+                // If no stages for this board, show a message
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No stages available for this board';
+                option.disabled = true;
+                stageSelect.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error loading stages for board:', error);
+            this.showNotification('Error loading stages for selected board', 'error');
+        }
+    }
+
+    async handleUserChange(event) {
+        const userId = event.target.value;
+        const boardSelect = document.getElementById('taskBoard');
+        const stageSelect = document.getElementById('taskStage');
+        
+        // Clear board and stage selections
+        boardSelect.innerHTML = '<option value="">Select Board</option>';
+        stageSelect.innerHTML = '<option value="">Select Stage</option>';
+        
+        if (!userId) {
+            return;
+        }
+        
+        try {
+            // Load boards for the selected user
+            const boards = await this.apiCall(`boards&user_id=${userId}`);
+            
+            if (boards && boards.length > 0) {
+                boards.forEach(board => {
+                    // Check if option already exists
+                    const existingOption = boardSelect.querySelector(`option[value="${board.id}"]`);
+                    if (!existingOption) {
+                        const option = document.createElement('option');
+                        option.value = board.id;
+                        option.textContent = board.name;
+                        boardSelect.appendChild(option);
+                    }
+                });
+            } else {
+                // If no boards for this user, show a message
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No boards available for this user';
+                option.disabled = true;
+                boardSelect.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error loading boards for user:', error);
+            this.showNotification('Error loading boards for selected user', 'error');
+        }
+    }
+
+    toggleCompletedTasks(stageId) {
+        const completedContainer = document.getElementById(`completed-${stageId}`);
+        const header = completedContainer.previousElementSibling;
+        const icon = header.querySelector('i');
+        
+        if (completedContainer.style.display === 'none') {
+            completedContainer.style.display = 'block';
+            icon.className = 'fas fa-chevron-up';
+            header.classList.add('expanded');
+        } else {
+            completedContainer.style.display = 'none';
+            icon.className = 'fas fa-chevron-down';
+            header.classList.remove('expanded');
         }
     }
 }

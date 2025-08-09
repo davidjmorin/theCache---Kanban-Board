@@ -21,14 +21,14 @@ class CalendarApp {
             const data = await response.json();
             
             if (!data.authenticated) {
-                window.location.href = 'index.html';
+                window.location.href = '/kanban.html';
                 return;
             }
             
             document.getElementById('currentUser').textContent = data.user.name;
         } catch (error) {
             console.error('Auth check failed:', error);
-            window.location.href = 'index.html';
+            window.location.href = '/kanban.html';
         }
     }
 
@@ -90,7 +90,12 @@ class CalendarApp {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        for (let i = 0; i < 42; i++) {
+        // Calculate how many weeks we need to display
+        const endDate = new Date(lastDay);
+        endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
+        const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        
+        for (let i = 0; i < totalDays; i++) {
             const currentDate = new Date(startDate);
             currentDate.setDate(startDate.getDate() + i);
             
@@ -105,16 +110,18 @@ class CalendarApp {
                 dayDiv.classList.add('other-month');
             }
             
+            // Create day number element
             const dayNumber = document.createElement('div');
             dayNumber.className = 'calendar-day-number';
             dayNumber.textContent = currentDate.getDate();
             dayDiv.appendChild(dayNumber);
             
+            // Create tasks container (always create it, even if empty)
+            const tasksContainer = document.createElement('div');
+            tasksContainer.className = 'calendar-tasks';
+            
             const tasksForDay = this.getTasksForDate(currentDate);
             if (tasksForDay.length > 0) {
-                const tasksContainer = document.createElement('div');
-                tasksContainer.className = 'calendar-tasks';
-                
                 const tasksToShow = tasksForDay.slice(0, 3);
                 tasksToShow.forEach(task => {
                     const taskElement = this.createTaskElement(task);
@@ -128,10 +135,9 @@ class CalendarApp {
                     moreTasks.onclick = () => this.showDayTasks(currentDate, tasksForDay);
                     tasksContainer.appendChild(moreTasks);
                 }
-                
-                dayDiv.appendChild(tasksContainer);
             }
             
+            dayDiv.appendChild(tasksContainer);
             calendarDays.appendChild(dayDiv);
         }
     }
@@ -524,7 +530,7 @@ class CalendarApp {
     async handleLogout() {
         try {
             await fetch('api.php?endpoint=logout', { method: 'POST' });
-            window.location.href = 'index.html';
+            window.location.href = '/kanban.html';
         } catch (error) {
             console.error('Logout failed:', error);
         }

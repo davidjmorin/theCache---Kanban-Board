@@ -6,7 +6,7 @@ date_default_timezone_set('America/New_York');
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', 0); // Set to 1 in production with HTTPS
 ini_set('session.use_strict_mode', 1);
-ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.cookie_samesite', 'Lax'); // Changed from 'Strict' to 'Lax' for API compatibility
 ini_set('session.gc_maxlifetime', 3600); // 1 hour session timeout
 
 // Security headers
@@ -22,7 +22,9 @@ $allowedOrigins = [
     'http://localhost:8000',
     'http://localhost:3000',
     'http://127.0.0.1:8000',
-    'http://127.0.0.1:3000'
+    'http://127.0.0.1:3000',
+    'https://board.thecache.io',
+    'http://board.thecache.io'
     // Add your production domain here: 'https://yourdomain.com'
 ];
 
@@ -382,10 +384,54 @@ function runCrmMigrations($pdo) {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         description TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
+
+    // Create opportunities table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS opportunities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        status ENUM('new', 'qualified', 'proposal', 'negotiation', 'won', 'lost') DEFAULT 'new',
+        revenue DECIMAL(15,2) NULL,
+        probability INT DEFAULT 0,
+        close_date DATE NULL,
+        owner_id INT NULL,
         created_by INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create opportunity notes table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS opportunity_notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        opportunity_id INT NOT NULL,
+        user_id INT NOT NULL,
+        note_text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
+    // Create opportunity attachments table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS opportunity_attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        opportunity_id INT NOT NULL,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        filename VARCHAR(255) NOT NULL,
+        filepath VARCHAR(500) NOT NULL,
+        filesize INT NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
 
     // Create client group members table
@@ -401,6 +447,39 @@ function runCrmMigrations($pdo) {
         FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE CASCADE
     )");
 
+    // Create notes table for Obsidian-like notes
+    $pdo->exec("CREATE TABLE IF NOT EXISTS notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content LONGTEXT NOT NULL,
+        user_id INT NOT NULL,
+        client_id INT NULL,
+        task_id INT NULL,
+        tags TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+        INDEX idx_notes_user (user_id),
+        INDEX idx_notes_client (client_id),
+        INDEX idx_notes_task (task_id),
+        INDEX idx_notes_tags (tags),
+        FULLTEXT idx_notes_content (title, content)
+    )");
+
+    // Create note links table for bidirectional linking
+    $pdo->exec("CREATE TABLE IF NOT EXISTS note_links (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        source_note_id INT NOT NULL,
+        target_note_id INT NOT NULL,
+        link_type ENUM('bidirectional', 'unidirectional') DEFAULT 'bidirectional',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_note_link (source_note_id, target_note_id),
+        FOREIGN KEY (source_note_id) REFERENCES notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_note_id) REFERENCES notes(id) ON DELETE CASCADE
+    )");
+
     // Add indexes for better performance
     try {
         $pdo->exec("CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)");
@@ -414,6 +493,57 @@ function runCrmMigrations($pdo) {
     } catch (Exception $e) {
         // Indexes might already exist, ignore error
     }
+    
+    // Create TBR tables
+    createTbrTables($pdo);
+}
+
+function createTbrTables($pdo) {
+    // TBR Meetings table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_meetings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id INT NOT NULL,
+        meeting_date DATE NOT NULL,
+        meeting_type VARCHAR(100) DEFAULT 'Business Review',
+        primary_contact VARCHAR(255),
+        account_manager_id INT,
+        status ENUM('scheduled', 'completed', 'cancelled') DEFAULT 'scheduled',
+        notes TEXT,
+        recommendations TEXT,
+        created_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+        FOREIGN KEY (account_manager_id) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    )");
+    
+    // TBR Attendees table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_attendees (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        meeting_id INT NOT NULL,
+        user_id INT,
+        name VARCHAR(255),
+        email VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES tbr_meetings(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )");
+    
+    // TBR Attachments table  
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tbr_attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        meeting_id INT NOT NULL,
+        filename VARCHAR(255) NOT NULL,
+        original_filename VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INT,
+        mime_type VARCHAR(100),
+        uploaded_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES tbr_meetings(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+    )");
 }
 
 function sendResponse($data, $status = 200) {
@@ -447,30 +577,62 @@ function validateCSRFToken($token) {
 }
 
 function getRequestBody() {
-    return json_decode(file_get_contents('php://input'), true);
+    error_log('DEBUG: getRequestBody - Starting');
+    $input = file_get_contents('php://input');
+    error_log('DEBUG: getRequestBody - Raw input: ' . $input);
+    
+    if ($input === false) {
+        error_log('DEBUG: getRequestBody - Failed to read input');
+        return null;
+    }
+    
+    $data = json_decode($input, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('DEBUG: getRequestBody - JSON decode error: ' . json_last_error_msg());
+        return null;
+    }
+    
+    error_log('DEBUG: getRequestBody - Decoded data: ' . print_r($data, true));
+    return $data;
 }
 
 function validateRequired($data, $fields) {
+    error_log('DEBUG: validateRequired - Starting with fields: ' . print_r($fields, true));
+    error_log('DEBUG: validateRequired - Data: ' . print_r($data, true));
+    
     $missing = [];
     foreach ($fields as $field) {
+        error_log('DEBUG: validateRequired - Checking field: ' . $field);
         if (!isset($data[$field])) {
+            error_log('DEBUG: validateRequired - Field not set: ' . $field);
             $missing[] = $field;
         } elseif (is_array($data[$field]) && empty($data[$field])) {
+            error_log('DEBUG: validateRequired - Array field empty: ' . $field);
             $missing[] = $field;
         } elseif (!is_array($data[$field]) && empty(trim($data[$field]))) {
+            error_log('DEBUG: validateRequired - String field empty: ' . $field);
             $missing[] = $field;
+        } else {
+            error_log('DEBUG: validateRequired - Field valid: ' . $field);
         }
     }
     if (!empty($missing)) {
+        error_log('DEBUG: validateRequired - Missing fields: ' . implode(', ', $missing));
         sendResponse(['error' => 'Missing required fields: ' . implode(', ', $missing)], 400);
     }
+    error_log('DEBUG: validateRequired - All fields valid');
 }
 
 function sanitizeInput($input) {
+    error_log('DEBUG: sanitizeInput - Input: ' . print_r($input, true));
     if (is_array($input)) {
-        return array_map('sanitizeInput', $input);
+        $result = array_map('sanitizeInput', $input);
+        error_log('DEBUG: sanitizeInput - Array result: ' . print_r($result, true));
+        return $result;
     }
-    return htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+    $result = htmlspecialchars(strip_tags(trim($input)), ENT_QUOTES, 'UTF-8');
+    error_log('DEBUG: sanitizeInput - String result: ' . $result);
+    return $result;
 }
 
 function sanitizeOutput($output) {

@@ -51,6 +51,8 @@
 .calendar-days {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: minmax(120px, auto);
+    gap: 0;
 }
 
 .calendar-day {
@@ -58,9 +60,12 @@
     padding: 0.5rem;
     border-right: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
-    position: relative;
     background: var(--card-background);
     transition: background-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
 }
 
 .calendar-day:hover {
@@ -82,11 +87,13 @@
 }
 
 .calendar-day-number {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
     font-weight: 600;
     color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    line-height: 1;
+    position: relative;
     z-index: 1;
 }
 
@@ -95,10 +102,13 @@
 }
 
 .calendar-tasks {
-    margin-top: 2rem;
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    overflow: hidden;
+    min-height: 0;
+    position: relative;
 }
 
 .calendar-task {
@@ -113,6 +123,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    line-height: 1.2;
 }
 
 .calendar-task:hover {
@@ -135,17 +146,10 @@
 }
 
 .calendar-task-multiple {
-    position: relative;
-}
-
-.calendar-task-multiple::after {
-    content: '+';
-    position: absolute;
-    right: 0.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-weight: bold;
-    font-size: 0.7rem;
+    background: var(--secondary-color);
+    color: var(--text-primary);
+    text-align: center;
+    font-weight: 500;
 }
 
 /* Task Modal Styles */
