@@ -1,6 +1,4 @@
-<img width="479" height="427" alt="thecahce_kanban_logo" src="https://github.com/user-attachments/assets/669ccc95-ceb4-43c7-b322-ebc6563f7ed2" />
-
-# The Cache - Kanban Board Application
+# Kanban Board Application
 
 A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This application provides comprehensive project management and task tracking capabilities with advanced features like email notifications, file attachments, and real-time collaboration.
 
@@ -108,12 +106,18 @@ A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This 
 - **Mobile Board Selector** - Easy board switching on mobile
 
 ### **🔐 Security Features**
-- **Secure Authentication** - Protected login and registration
-- **Environment Variables** - Secure API key storage
-- **SQL Injection Protection** - Prepared statements for all queries
-- **XSS Protection** - Proper input sanitization and escaping
-- **File Upload Security** - Validated file uploads with size limits
-- **CORS Headers** - Secure API access configuration
+- **Advanced Authentication** - Secure password hashing with bcrypt and session management
+- **CSRF Protection** - Cross-Site Request Forgery prevention with token validation
+- **Rate Limiting** - Brute force protection for login attempts
+- **SQL Injection Protection** - Parameterized queries and prepared statements
+- **XSS Protection** - Comprehensive input sanitization and output escaping
+- **Content Security Policy** - Strict CSP headers to prevent code injection
+- **File Upload Security** - MIME type validation, size limits, and malicious content scanning
+- **CORS Configuration** - Restricted cross-origin access with environment-based origins
+- **Security Headers** - HSTS, X-Frame-Options, X-Content-Type-Options, and more
+- **Input Validation** - Multi-layer validation with custom sanitization functions
+- **Security Logging** - Comprehensive audit trail of security events
+- **Environment-Based Config** - All sensitive configuration via .env files
 
 ### **⚡ Performance Features**
 - **Optimized Loading** - Efficient data loading and caching
@@ -137,10 +141,12 @@ A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This 
 - **Markdown Support** - Rich text formatting capabilities
 
 ### **Backend**
-- **PHP 7.4+** - Modern PHP with type hints
-- **MySQL 5.7+** - Reliable database system
-- **RESTful API** - Clean, stateless API design
-- **Environment Configuration** - Secure configuration management
+- **PHP 7.4+** - Modern PHP with comprehensive security features
+- **MySQL 5.7+** - Reliable database with prepared statements
+- **RESTful API** - Secure, stateless API with CSRF protection
+- **Environment Configuration** - Complete .env-based configuration management
+- **Security Framework** - Multi-layer security with rate limiting and audit logging
+- **Apache/Nginx** - Web server with security headers and HTTPS enforcement
 
 ### **External Services**
 - **Brevo Email Service** - Professional email delivery
@@ -150,10 +156,12 @@ A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This 
 ## 📦 **Installation**
 
 ### **Prerequisites**
-- PHP 7.4 or higher
-- MySQL 5.7 or higher
-- Web server (Apache/Nginx) or PHP built-in server
-- Brevo account for email notifications
+- **PHP 7.4 or higher** with required extensions (PDO, MySQLi, fileinfo)
+- **MySQL 5.7 or higher** or MariaDB equivalent
+- **Web server** (Apache with mod_rewrite and mod_headers, or Nginx)
+- **HTTPS/SSL Certificate** (required for secure session cookies)
+- **Brevo account** for email notifications
+- **Domain name** for production deployment
 
 ### **Setup Steps**
 
@@ -161,29 +169,56 @@ A modern, feature-rich kanban board built with vanilla JavaScript and PHP. This 
 
 2. **Environment Configuration**
    - Create `.env` file in the root directory
-   - Add your configuration:
-   ```
-   BREVO_API_KEY=your-brevo-api-key
+   - Configure all required settings:
+   ```env
+   # Database Configuration
    DB_HOST=localhost
    DB_NAME=kanban_board2
    DB_USER=your_username
    DB_PASS=your_password
+   
+   # Email Service Configuration
+   BREVO_API_KEY=your-brevo-api-key
+   SENDER_EMAIL=noreply@yourdomain.com
+   SENDER_NAME=Your Task Management System
+   ADMIN_EMAIL=admin@yourdomain.com
+   
+   # Security Configuration
+   CORS_ORIGIN=https://yourdomain.com
+   
+   # Optional: Google Services
+   GOOGLE_API_KEY=your-google-api-key
    ```
 
 3. **Database Setup**
    - The application will automatically create the database and tables on first run
    - Tables include: companies, boards, stages, tasks, users, clients, notes, attachments, checklists, shares
 
-4. **File Permissions**
+4. **Security Setup**
    ```bash
+   # Set secure file permissions
    chmod 755 uploads/
-   chmod 644 .env
+   chmod 600 .env
+   chown www-data:www-data uploads/
+   chown www-data:www-data .env
+   
+   # Ensure Apache modules are enabled (if using Apache)
+   a2enmod headers
+   a2enmod rewrite
+   systemctl reload apache2
    ```
 
 5. **Email Configuration**
    - Sign up for a free Brevo account
    - Create an API key with SMTP permissions
-   - Add the API key to your `.env` file
+   - Configure email settings in your `.env` file
+   - Set appropriate sender domains and email addresses
+
+6. **Security Configuration**
+   - Update `CORS_ORIGIN` to match your domain
+   - Configure security headers via the included `.htaccess`
+   - Set up HTTPS (required for secure session cookies)
+   - Review and adjust security settings as needed
 
 ## 🚀 **Quick Start**
 
@@ -287,16 +322,107 @@ The application provides a comprehensive RESTful API:
 - **Edge** 79+
 - **Mobile browsers** (iOS Safari, Chrome Mobile)
 
-## 🔒 **Security Features**
+## 🔒 **Comprehensive Security Framework**
 
-- **SQL Injection Protection** - Prepared statements for all database queries
-- **XSS Protection** - Input sanitization and output escaping
-- **CSRF Protection** - Cross-site request forgery prevention
-- **File Upload Security** - Validated file types and size limits
-- **Environment Variables** - Secure configuration management
-- **CORS Headers** - Proper cross-origin resource sharing
-- **Input Validation** - Comprehensive data validation
-- **Error Handling** - Secure error messages without information leakage
+### **🛡️ Authentication & Session Security**
+- **Secure Password Hashing** - bcrypt with proper salt rounds
+- **Session Management** - Secure session configuration with HTTPOnly, Secure, and SameSite settings
+- **Session Regeneration** - Automatic session ID regeneration on authentication
+- **Rate Limiting** - Brute force protection for login attempts
+- **Account Lockout** - Protection against repeated failed login attempts
+
+### **🔐 Cross-Site Attack Prevention**
+- **CSRF Protection** - Token-based validation for all state-changing operations
+- **XSS Protection** - Multi-layer input sanitization and output escaping
+- **Content Security Policy** - Strict CSP headers preventing code injection
+- **X-Frame-Options** - Clickjacking protection
+- **Input Validation** - Custom validation functions with comprehensive sanitization
+
+### **💉 SQL Injection Prevention**
+- **Parameterized Queries** - All database interactions use prepared statements
+- **Type Validation** - Strict type checking for all inputs
+- **Error Handling** - Secure error messages without database structure leakage
+
+### **📁 File Upload Security**
+- **MIME Type Validation** - Server-side file type verification
+- **File Size Limits** - Configurable upload size restrictions
+- **Content Scanning** - Detection and prevention of malicious file content
+- **Secure File Storage** - Isolated upload directory with execution prevention
+- **File Extension Filtering** - Whitelist-based file type restrictions
+
+### **🌐 Network Security**
+- **HTTPS Enforcement** - Automatic redirect to secure connections
+- **HSTS Headers** - HTTP Strict Transport Security implementation
+- **CORS Configuration** - Environment-based origin restrictions
+- **Security Headers** - Comprehensive security header implementation
+
+### **📊 Security Monitoring**
+- **Security Event Logging** - Comprehensive audit trail of security events
+- **Failed Login Tracking** - Monitoring and logging of authentication failures
+- **Suspicious Activity Detection** - Automated detection of potential threats
+- **IP-based Rate Limiting** - Protection against distributed attacks
+
+### **⚙️ Configuration Security**
+- **Environment Variables** - All sensitive configuration externalized
+- **Secure File Permissions** - Restricted access to configuration files
+- **No Debug Information** - Production-safe error handling
+- **Security Headers** - X-Content-Type-Options, X-XSS-Protection, and more
+
+## ⚙️ **Environment Configuration**
+
+### **🔧 Required Environment Variables**
+
+The application uses a `.env` file for all configuration. Here's a complete reference:
+
+```env
+# Database Configuration (Required)
+DB_HOST=localhost                    # Database server hostname
+DB_NAME=kanban_board2               # Database name
+DB_USER=your_username               # Database username
+DB_PASS=your_password               # Database password
+
+# Email Configuration (Required for notifications)
+BREVO_API_KEY=your-brevo-api-key    # Brevo email service API key
+SENDER_EMAIL=noreply@yourdomain.com # Default sender email address
+SENDER_NAME=Your Task Management    # Default sender name
+ADMIN_EMAIL=admin@yourdomain.com    # Admin email for notifications
+
+# Security Configuration (Required)
+CORS_ORIGIN=https://yourdomain.com  # Allowed origin for CORS requests
+
+# Optional Configuration
+GOOGLE_API_KEY=your-google-key      # For Google services integration
+```
+
+### **🚀 Deployment Environments**
+
+#### **Development**
+```env
+CORS_ORIGIN=http://localhost:3000
+SENDER_EMAIL=dev@localhost
+ADMIN_EMAIL=admin@localhost
+```
+
+#### **Staging**
+```env
+CORS_ORIGIN=https://staging.yourdomain.com
+SENDER_EMAIL=noreply@staging.yourdomain.com
+ADMIN_EMAIL=admin@staging.yourdomain.com
+```
+
+#### **Production**
+```env
+CORS_ORIGIN=https://yourdomain.com
+SENDER_EMAIL=noreply@yourdomain.com
+ADMIN_EMAIL=admin@yourdomain.com
+```
+
+### **🔒 Security Considerations**
+
+- **File Permissions**: `.env` file should have 600 permissions (readable only by owner)
+- **Version Control**: Never commit `.env` files to version control
+- **Environment Isolation**: Use different `.env` files for each environment
+- **Secret Management**: Store sensitive keys securely and rotate regularly
 
 ## 📈 **Performance Optimizations**
 
