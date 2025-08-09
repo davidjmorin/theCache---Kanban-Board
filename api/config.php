@@ -203,6 +203,19 @@ function createTables($pdo) {
         UNIQUE KEY unique_user_module (user_id, module_name)
     )");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS user_logos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        filename VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        file_size INT NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+
     insertDefaultData($pdo);
 }
 
@@ -605,7 +618,13 @@ function sendResponse($data, $status = 200) {
         'Authentication required',
         'Admin access required',
         'Method not allowed',
-        'Endpoint not found'
+        'Endpoint not found',
+        'Logo file is required',
+        'Invalid file type. Allowed types: jpg, jpeg, png, gif, svg',
+        'File too large. Maximum size: 2MB',
+        'Invalid file format detected',
+        'Failed to save file',
+        'No active logo found'
     ];
     
     if (isset($data['error']) && !isDevelopment()) {

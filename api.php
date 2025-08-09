@@ -211,6 +211,14 @@ switch ($endpoint) {
         requireAuth();
         handleUserPreferences($pdo, $method, $id);
         break;
+    case 'logo-upload':
+        requireAuth();
+        handleLogoUpload($pdo, $method);
+        break;
+    case 'user-logo':
+        requireAuth();
+        handleUserLogo($pdo, $method);
+        break;
     case '2fa-setup':
         requireAuth();
         handle2FASetup($pdo, $method);
@@ -4859,6 +4867,177 @@ function handleUserPreferences($pdo, $method, $id = null) {
                 sendResponse(['success' => true, 'message' => 'Preferences updated successfully']);
             } catch (Exception $e) {
                 sendResponse(['error' => 'Failed to update preferences: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+// ============================================================================
+// Logo Upload Handler Functions
+// ============================================================================
+
+function handleLogoUpload($pdo, $method) {
+    if ($method !== 'POST') {
+        sendResponse(['error' => 'Method not allowed'], 405);
+        return;
+    }
+
+    $userId = $_SESSION['user_id'];
+    
+    if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
+        sendResponse(['error' => 'Logo file is required'], 400);
+        return;
+    }
+
+    $file = $_FILES['logo'];
+    $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+    $maxFileSize = 2 * 1024 * 1024; // 2MB limit for logos
+    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    
+    // Validate file extension
+    if (!in_array($extension, $allowedTypes)) {
+        sendResponse(['error' => 'Invalid file type. Allowed types: ' . implode(', ', $allowedTypes)], 400);
+        return;
+    }
+    
+    // Validate file size
+    if ($file['size'] > $maxFileSize) {
+        sendResponse(['error' => 'File too large. Maximum size: 2MB'], 400);
+        return;
+    }
+    
+    // Validate MIME type
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    $allowedMimeTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'
+    ];
+    
+    if (!in_array($mimeType, $allowedMimeTypes)) {
+        sendResponse(['error' => 'Invalid file format detected'], 400);
+        return;
+    }
+    
+    // Create uploads/logos directory if it doesn't exist
+    $logoDir = __DIR__ . '/uploads/logos/';
+    if (!is_dir($logoDir)) {
+        mkdir($logoDir, 0755, true);
+    }
+    
+    // Generate unique filename
+    $filename = 'logo_' . $userId . '_' . time() . '.' . $extension;
+    $uploadPath = $logoDir . $filename;
+    
+    try {
+        // Move uploaded file
+        if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
+            sendResponse(['error' => 'Failed to save file'], 500);
+            return;
+        }
+        
+        // Deactivate previous logos for this user
+        $stmt = $pdo->prepare("UPDATE user_logos SET is_active = FALSE WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        
+        // Save logo info to database
+        $stmt = $pdo->prepare("
+            INSERT INTO user_logos (user_id, filename, original_name, file_size, mime_type, is_active) 
+            VALUES (?, ?, ?, ?, ?, TRUE)
+        ");
+        $stmt->execute([
+            $userId,
+            $filename,
+            $file['name'],
+            $file['size'],
+            $mimeType
+        ]);
+        
+        // Log security event
+        createSecurityLog($pdo, 'LOGO_UPLOAD', "User ID: $userId, File: $filename", 'INFO');
+        
+        sendResponse([
+            'success' => true,
+            'message' => 'Logo uploaded successfully',
+            'logo_url' => '/uploads/logos/' . $filename
+        ]);
+        
+    } catch (Exception $e) {
+        // Clean up uploaded file if database operation failed
+        if (file_exists($uploadPath)) {
+            unlink($uploadPath);
+        }
+        sendResponse(['error' => 'Failed to save logo: ' . $e->getMessage()], 500);
+    }
+}
+
+function handleUserLogo($pdo, $method) {
+    $userId = $_SESSION['user_id'];
+    
+    switch ($method) {
+        case 'GET':
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT filename, original_name, created_at 
+                    FROM user_logos 
+                    WHERE user_id = ? AND is_active = TRUE 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ");
+                $stmt->execute([$userId]);
+                $logo = $stmt->fetch();
+                
+                if ($logo) {
+                    sendResponse([
+                        'has_logo' => true,
+                        'logo_url' => '/uploads/logos/' . $logo['filename'],
+                        'original_name' => $logo['original_name'],
+                        'uploaded_at' => $logo['created_at']
+                    ]);
+                } else {
+                    sendResponse([
+                        'has_logo' => false,
+                        'logo_url' => '/assets/thecache_logo.png'
+                    ]);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to get logo: ' . $e->getMessage()], 500);
+            }
+            break;
+            
+        case 'DELETE':
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT filename FROM user_logos 
+                    WHERE user_id = ? AND is_active = TRUE
+                ");
+                $stmt->execute([$userId]);
+                $logo = $stmt->fetch();
+                
+                if ($logo) {
+                    // Delete file from filesystem
+                    $logoPath = __DIR__ . '/../uploads/logos/' . $logo['filename'];
+                    if (file_exists($logoPath)) {
+                        unlink($logoPath);
+                    }
+                    
+                    // Deactivate in database
+                    $stmt = $pdo->prepare("UPDATE user_logos SET is_active = FALSE WHERE user_id = ?");
+                    $stmt->execute([$userId]);
+                    
+                    // Log security event
+                    createSecurityLog($pdo, 'LOGO_DELETE', "User ID: $userId", 'INFO');
+                    
+                    sendResponse(['success' => true, 'message' => 'Logo deleted successfully']);
+                } else {
+                    sendResponse(['error' => 'No active logo found'], 404);
+                }
+            } catch (Exception $e) {
+                sendResponse(['error' => 'Failed to delete logo: ' . $e->getMessage()], 500);
             }
             break;
             

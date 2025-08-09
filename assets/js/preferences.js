@@ -4,6 +4,7 @@ class PreferencesApp {
         this.currentUser = null;
         this.preferences = {};
         this.saveTimeout = null;
+        this.currentLogo = null;
 
         this.moduleConfig = {
             dashboard: {
@@ -43,8 +44,10 @@ class PreferencesApp {
         
         if (this.currentUser) {
             await this.loadPreferences();
+            await this.loadCurrentLogo();
             this.renderModuleCards();
             this.setupEventListeners();
+            this.setupLogoHandlers();
             document.getElementById('loadingPreferences').style.display = 'none';
             document.getElementById('preferencesContent').style.display = 'block';
         }
@@ -206,6 +209,146 @@ class PreferencesApp {
         this.saveTimeout = setTimeout(() => {
             saveStatus.classList.remove('show');
         }, 2000);
+    }
+
+    async loadCurrentLogo() {
+        try {
+            const response = await fetch(this.apiBase + 'user-logo');
+            if (response.ok) {
+                this.currentLogo = await response.json();
+                this.updateLogoPreview();
+            } else {
+                console.error('Failed to load current logo');
+            }
+        } catch (error) {
+            console.error('Error loading current logo:', error);
+        }
+    }
+
+    updateLogoPreview() {
+        const logoImg = document.getElementById('currentLogo');
+        const logoStatus = document.getElementById('logoStatus');
+        const logoDetails = document.getElementById('logoDetails');
+        const deleteBtn = document.getElementById('deleteLogoBtn');
+
+        if (this.currentLogo && this.currentLogo.has_logo) {
+            logoImg.src = this.currentLogo.logo_url;
+            logoStatus.textContent = 'Custom Logo';
+            logoDetails.textContent = `Uploaded: ${this.currentLogo.original_name}`;
+            deleteBtn.style.display = 'inline-flex';
+        } else {
+            logoImg.src = '/assets/thecache_logo.png';
+            logoStatus.textContent = 'Default Logo';
+            logoDetails.textContent = 'Using system default logo';
+            deleteBtn.style.display = 'none';
+        }
+    }
+
+    setupLogoHandlers() {
+        const logoInput = document.getElementById('logoInput');
+        const uploadBtn = document.getElementById('uploadLogoBtn');
+        const deleteBtn = document.getElementById('deleteLogoBtn');
+
+        uploadBtn.addEventListener('click', () => {
+            logoInput.click();
+        });
+
+        logoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.uploadLogo(e.target.files[0]);
+            }
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            this.deleteLogo();
+        });
+    }
+
+    async uploadLogo(file) {
+        // Validate file
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Invalid file type. Please upload JPG, PNG, GIF, or SVG files only.');
+            return;
+        }
+
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (file.size > maxSize) {
+            alert('File too large. Maximum size is 2MB.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('logo', file);
+
+        try {
+            // Show uploading state
+            const uploadBtn = document.getElementById('uploadLogoBtn');
+            const originalText = uploadBtn.innerHTML;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            uploadBtn.disabled = true;
+
+            const response = await fetch(this.apiBase + 'logo-upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Reload current logo and update preview
+                await this.loadCurrentLogo();
+                this.showSaveStatus('Logo uploaded successfully');
+                
+                // Refresh logos throughout the application
+                if (window.logoHelper) {
+                    window.logoHelper.refreshLogos();
+                }
+            } else {
+                alert('Upload failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Upload failed. Please try again.');
+        } finally {
+            // Reset button state
+            const uploadBtn = document.getElementById('uploadLogoBtn');
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Logo';
+            uploadBtn.disabled = false;
+            
+            // Clear file input
+            document.getElementById('logoInput').value = '';
+        }
+    }
+
+    async deleteLogo() {
+        if (!confirm('Are you sure you want to remove your custom logo? This will revert to the default logo.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(this.apiBase + 'user-logo', {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Reload current logo and update preview
+                await this.loadCurrentLogo();
+                this.showSaveStatus('Logo removed successfully');
+                
+                // Refresh logos throughout the application
+                if (window.logoHelper) {
+                    window.logoHelper.refreshLogos();
+                }
+            } else {
+                alert('Delete failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Delete failed. Please try again.');
+        }
     }
 }
 
