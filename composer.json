@@ -1,0 +1,8 @@
+{
+    "name": "kanban/board",
+    "description": "Kanban Board Application",
+    "require": {
+        "spomky-labs/otphp": "^11.3",
+        "endroid/qr-code": "^6.0"
+    }
+}
