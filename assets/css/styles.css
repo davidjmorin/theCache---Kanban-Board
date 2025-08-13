@@ -5074,6 +5074,129 @@ div#userMenu {
     color: var(--success-color);
 }
 
+.mrr-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--primary-color);
+    margin-left: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 6px;
+}
+
+/* Overview Tab Styles */
+.overview-container {
+    padding: 1rem 0;
+}
+
+.overview-header {
+    margin-bottom: 2rem;
+}
+
+.overview-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.overview-stat-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.overview-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.overview-stat-card .stat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-color-dark));
+    border-radius: 12px;
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.overview-stat-card .stat-content h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.overview-stat-card .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.overview-stat-card .stat-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.overview-stat-card .stat-details span {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.overview-recent-section {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.overview-recent-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.recent-opportunities {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.recent-opportunity-item {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--background);
+}
+
+.recent-opportunity-item .opportunity-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.recent-opportunity-item .opportunity-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.recent-opportunity-item .revenue {
+    font-weight: 500;
+    color: var(--success-color);
+}
+
 /* Status badges for opportunities */
 .status-badge {
     padding: 0.25rem 0.75rem;
@@ -5164,6 +5287,24 @@ div#userMenu {
     .opportunity-actions .btn {
         width: auto;
         flex: 1;
+    }
+}
+
+/* Responsive design for overview tab */
+@media (max-width: 768px) {
+    .overview-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .overview-stat-card {
+        padding: 1rem;
+    }
+    
+    .recent-opportunity-item .opportunity-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
     }
 }
 

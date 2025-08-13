@@ -211,6 +211,23 @@
     margin-bottom: 3rem;
 }
 
+/* MRR Grid Styles */
+.mrr-grid {
+    margin-bottom: 3rem;
+}
+
+.mrr-card .mrr-icon {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.mrr-card::before {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.mrr-card:hover::before {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
 .opportunity-card .won-icon {
     background: linear-gradient(135deg, #48bb78, #38a169);
 }

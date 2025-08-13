@@ -135,10 +135,11 @@ class DashboardApp {
                 this.apiCall('clients').catch(e => { console.error('Clients data failed:', e); return []; }),
                 this.apiCall('tasks').catch(e => { console.error('Tasks data failed:', e); return []; }),
                 this.apiCall('upcoming-tbr-meetings').catch(e => { console.error('TBR meetings data failed:', e); return []; }),
-                this.apiCall('opportunity-stats').catch(e => { console.error('Opportunity stats data failed:', e); return null; })
+                this.apiCall('opportunity-stats').catch(e => { console.error('Opportunity stats data failed:', e); return null; }),
+                this.apiCall('total-mrr').catch(e => { console.error('Total MRR data failed:', e); return { total_mrr: 0 }; })
             ];
 
-            const [companyData, boardsData, usersData, clientsData, tasksData, tbrMeetingsData, opportunityStatsData] = await Promise.all(promises);
+            const [companyData, boardsData, usersData, clientsData, tasksData, tbrMeetingsData, opportunityStatsData, totalMRRData] = await Promise.all(promises);
 
             this.data.company = companyData;
             this.data.boards = boardsData || [];
@@ -147,6 +148,7 @@ class DashboardApp {
             this.data.tasks = tasksData || [];
             this.data.tbrMeetings = tbrMeetingsData || [];
             this.data.opportunityStats = opportunityStatsData;
+            this.data.totalMRR = totalMRRData?.total_mrr || 0;
 
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
@@ -159,6 +161,7 @@ class DashboardApp {
         this.updateTaskOverview();
         this.updateTrends();
         this.updateOpportunityStats();
+        this.updateMRR();
         this.updateUpcomingTbrMeetings();
     }
 
@@ -273,27 +276,35 @@ class DashboardApp {
 
         const stats = this.data.opportunityStats;
         
-        const formatCurrency = (amount) => {
-            if (amount >= 1000000) {
-                return `$${(amount / 1000000).toFixed(1)}M`;
-            } else if (amount >= 1000) {
-                return `$${(amount / 1000).toFixed(1)}K`;
-            } else {
-                return `$${amount.toLocaleString()}`;
-            }
-        };
-
         document.getElementById('wonOpportunities').textContent = stats.won?.count || 0;
-        document.getElementById('wonRevenue').textContent = formatCurrency(stats.won?.total_revenue || 0);
+        document.getElementById('wonRevenue').textContent = this.formatCurrency(stats.won?.total_revenue || 0);
 
         document.getElementById('qualifiedOpportunities').textContent = stats.qualified?.count || 0;
-        document.getElementById('qualifiedRevenue').textContent = formatCurrency(stats.qualified?.total_revenue || 0);
+        document.getElementById('qualifiedRevenue').textContent = this.formatCurrency(stats.qualified?.total_revenue || 0);
 
         document.getElementById('proposalOpportunities').textContent = stats.proposal?.count || 0;
-        document.getElementById('proposalRevenue').textContent = formatCurrency(stats.proposal?.total_revenue || 0);
+        document.getElementById('proposalRevenue').textContent = this.formatCurrency(stats.proposal?.total_revenue || 0);
 
         document.getElementById('lostOpportunities').textContent = stats.lost?.count || 0;
-        document.getElementById('lostRevenue').textContent = formatCurrency(stats.lost?.total_revenue || 0);
+        document.getElementById('lostRevenue').textContent = this.formatCurrency(stats.lost?.total_revenue || 0);
+    }
+
+    formatCurrency(amount) {
+        if (amount >= 1000000) {
+            return `$${(amount / 1000000).toFixed(1)}M`;
+        } else if (amount >= 1000) {
+            return `$${(amount / 1000).toFixed(1)}K`;
+        } else {
+            return `$${amount.toLocaleString()}`;
+        }
+    }
+
+    updateMRR() {
+        const totalMRR = this.data.totalMRR || 0;
+        const mrrElement = document.getElementById('totalMRR');
+        if (mrrElement) {
+            mrrElement.textContent = this.formatCurrency(totalMRR);
+        }
     }
 
     updateUpcomingTbrMeetings() {

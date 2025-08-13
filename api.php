@@ -159,6 +159,10 @@ switch ($endpoint) {
         requireAuth();
         handleOpportunityStats($pdo, $method);
         break;
+    case 'total-mrr':
+        requireAuth();
+        handleTotalMRR($pdo, $method);
+        break;
     case 'opportunity-notes':
         requireAuth();
         $opportunityId = $_GET['opportunity_id'] ?? null;
@@ -4924,9 +4928,9 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
             
             $stmt = $pdo->prepare("
                 INSERT INTO opportunities (
-                    client_id, title, description, status, revenue, 
+                    client_id, title, description, status, revenue, mrr,
                     probability, close_date, owner_id, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['client_id'],
@@ -4934,6 +4938,7 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
                 $data['description'] ?? null,
                 $data['status'] ?? 'new',
                 $data['revenue'] ?? null,
+                $data['mrr'] ?? null,
                 $data['probability'] ?? 0,
                 $data['close_date'] ?? null,
                 $data['owner_id'] ?? null,
@@ -4966,7 +4971,7 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
             
             $stmt = $pdo->prepare("
                 UPDATE opportunities SET 
-                    title = ?, description = ?, status = ?, revenue = ?, 
+                    title = ?, description = ?, status = ?, revenue = ?, mrr = ?,
                     probability = ?, close_date = ?, owner_id = ?
                 WHERE id = ?
             ");
@@ -4975,6 +4980,7 @@ function handleOpportunities($pdo, $method, $id, $clientId) {
                 $data['description'] ?? null,
                 $data['status'] ?? 'new',
                 $data['revenue'] ?? null,
+                $data['mrr'] ?? null,
                 $data['probability'] ?? 0,
                 $data['close_date'] ?? null,
                 $data['owner_id'] ?? null,
@@ -5200,7 +5206,8 @@ function handleOpportunityStats($pdo, $method) {
                     SELECT 
                         status,
                         COUNT(*) as count,
-                        COALESCE(SUM(revenue), 0) as total_revenue
+                        COALESCE(SUM(revenue), 0) as total_revenue,
+                        COALESCE(SUM(mrr), 0) as total_mrr
                     FROM opportunities 
                     GROUP BY status
                 ");
@@ -5210,7 +5217,8 @@ function handleOpportunityStats($pdo, $method) {
                     SELECT 
                         o.status,
                         COUNT(*) as count,
-                        COALESCE(SUM(o.revenue), 0) as total_revenue
+                        COALESCE(SUM(o.revenue), 0) as total_revenue,
+                        COALESCE(SUM(o.mrr), 0) as total_mrr
                     FROM opportunities o
                     LEFT JOIN clients c ON o.client_id = c.id
                     LEFT JOIN crm_activities ca ON c.id = ca.client_id
@@ -5224,24 +5232,62 @@ function handleOpportunityStats($pdo, $method) {
             $results = $stmt->fetchAll();
             
             $stats = [
-                'new' => ['count' => 0, 'total_revenue' => 0],
-                'qualified' => ['count' => 0, 'total_revenue' => 0],
-                'proposal' => ['count' => 0, 'total_revenue' => 0],
-                'negotiation' => ['count' => 0, 'total_revenue' => 0],
-                'won' => ['count' => 0, 'total_revenue' => 0],
-                'lost' => ['count' => 0, 'total_revenue' => 0]
+                'new' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0],
+                'qualified' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0],
+                'proposal' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0],
+                'negotiation' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0],
+                'won' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0],
+                'lost' => ['count' => 0, 'total_revenue' => 0, 'total_mrr' => 0]
             ];
             
             foreach ($results as $row) {
                 if (isset($stats[$row['status']])) {
                     $stats[$row['status']] = [
                         'count' => (int)$row['count'],
-                        'total_revenue' => (float)$row['total_revenue']
+                        'total_revenue' => (float)$row['total_revenue'],
+                        'total_mrr' => (float)$row['total_mrr']
                     ];
                 }
             }
             
             sendResponse($stats);
+            break;
+            
+        default:
+            sendResponse(['error' => 'Method not allowed'], 405);
+    }
+}
+
+function handleTotalMRR($pdo, $method) {
+    switch ($method) {
+        case 'GET':
+            $userId = $_SESSION['user_id'];
+            $isAdmin = $_SESSION['is_admin'] ?? false;
+            
+            if ($isAdmin) {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(mrr), 0) as total_mrr
+                    FROM opportunities 
+                    WHERE status = 'won'
+                ");
+                $stmt->execute();
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(o.mrr), 0) as total_mrr
+                    FROM opportunities o
+                    LEFT JOIN clients c ON o.client_id = c.id
+                    LEFT JOIN crm_activities ca ON c.id = ca.client_id
+                    LEFT JOIN tasks t ON c.id = t.client_id
+                    WHERE o.status = 'won' 
+                    AND (o.owner_id = ? OR o.created_by = ? OR ca.user_id = ? OR t.user_id = ? OR t.created_by = ?)
+                ");
+                $stmt->execute([$userId, $userId, $userId, $userId, $userId]);
+            }
+            
+            $result = $stmt->fetch();
+            $totalMRR = (float)$result['total_mrr'];
+            
+            sendResponse(['total_mrr' => $totalMRR]);
             break;
             
         default:

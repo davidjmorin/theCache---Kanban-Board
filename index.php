@@ -8,8 +8,8 @@
     <link rel="shortcut icon" type="image/png" href="assets/thecache_logo.png">
     <link rel="apple-touch-icon" href="assets/thecache_logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/styles.css?v5.8">
-    <link rel="stylesheet" href="assets/css/dashboard.css?V2.8">
+    <link rel="stylesheet" href="assets/css/styles.css?v5.25">
+    <link rel="stylesheet" href="assets/css/dashboard.css?V2.25">
 </head>
 <body>
     <div class="login-container" id="loginContainer" style="display: none;">
@@ -210,6 +210,34 @@
                 </div>
             </div>
 
+            <!-- MRR Widget Section -->
+            <div class="section-header" data-crm-section="mrr">
+                <div class="section-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="section-title">
+                    <h2>Monthly Recurring Revenue</h2>
+                    <p>Track your subscription and recurring revenue</p>
+                </div>
+            </div>
+
+            <div class="metrics-grid mrr-grid" data-crm-section="mrr">
+                <div class="metric-card mrr-card">
+                    <div class="metric-icon mrr-icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 class="metric-title">Total MRR</h3>
+                        <div class="metric-value" id="totalMRR">$0</div>
+                        <p class="metric-description">From won opportunities</p>
+                        <div class="metric-trend mrr-trend">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Monthly recurring</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Overview and Actions Section -->
             <div class="overview-grid">
                 <div class="overview-card">
@@ -326,6 +354,6 @@
     </div>
 
     <script src="assets/js/logo-helper.js?v=1.0"></script>
-    <script src="assets/js/dashboard.js?v=1.8"></script>
+    <script src="assets/js/dashboard.js?v=1.10"></script>
 </body>
 </html>

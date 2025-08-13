@@ -2762,6 +2762,6 @@
     </div>
 
     <script src="assets/js/logo-helper.js?v=1.1"></script>
-    <script src="assets/js/crm.js?v=1.0.23"></script>
+    <script src="assets/js/crm.js?v=1.0.30"></script>
 </body>
 </html>

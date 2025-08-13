@@ -423,6 +423,9 @@ class CRMApp {
                     <button class="tab-button active" onclick="crmApp.switchTab('activity', event)">
                         <i class="fas fa-calendar"></i> Activity
                     </button>
+                    <button class="tab-button" onclick="crmApp.switchTab('overview', event)">
+                        <i class="fas fa-info-circle"></i> Overview
+                    </button>
                     <button class="tab-button" onclick="crmApp.switchTab('contacts', event)">
                         <i class="fas fa-users"></i> Contacts <span class="tab-count">(${client.contacts ? client.contacts.length : 0})</span>
                     </button>
@@ -450,6 +453,13 @@ class CRMApp {
                     <div class="loading">
                         <i class="fas fa-spinner fa-spin"></i>
                         <p>Loading activities...</p>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="overviewTab">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading overview...</p>
                     </div>
                 </div>
                 
@@ -520,6 +530,12 @@ class CRMApp {
                 console.log('Client activities:', client.activities);
                 activitiesTab.innerHTML = this.renderActivityTab(client);
             }
+            
+            // Also render the overview tab content
+            const overviewTab = document.getElementById('overviewTab');
+            if (overviewTab) {
+                overviewTab.innerHTML = this.renderOverviewTab(client);
+            }
         }, 100);
     }
 
@@ -556,6 +572,9 @@ class CRMApp {
                 switch (tabName) {
                     case 'activity':
                         tabContent.innerHTML = this.renderActivityTab(this.currentClient);
+                        break;
+                    case 'overview':
+                        tabContent.innerHTML = this.renderOverviewTab(this.currentClient);
                         break;
                     case 'contacts':
                         tabContent.innerHTML = this.renderContactsTab(this.currentClient);
@@ -660,6 +679,102 @@ class CRMApp {
                 </div>
             `;
         }).join('');
+    }
+
+    renderOverviewTab(client) {
+        const opportunities = client.opportunities || [];
+        const tasks = client.tasks || [];
+        const todos = client.todos || [];
+        const contacts = client.contacts || [];
+        const assets = client.assets || [];
+        
+        // Calculate totals
+        const totalRevenue = opportunities.reduce((sum, opp) => sum + (opp.revenue || 0), 0);
+        const totalMRR = opportunities.reduce((sum, opp) => sum + (opp.mrr || 0), 0);
+        const wonOpportunities = opportunities.filter(opp => opp.status === 'won');
+        const wonMRR = wonOpportunities.reduce((sum, opp) => sum + (opp.mrr || 0), 0);
+        const activeTasks = tasks.filter(task => task.status !== 'closed' && task.status !== 'completed');
+        const completedTasks = tasks.filter(task => task.status === 'closed' || task.status === 'completed');
+        
+        return `
+            <div class="overview-container">
+                <div class="overview-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text-primary);">Client Overview</h2>
+                </div>
+                
+                <div class="overview-stats-grid">
+                    <div class="overview-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Opportunities</h3>
+                            <div class="stat-value">${opportunities.length}</div>
+                            <div class="stat-details">
+                                <span>Total Revenue: $${totalRevenue.toLocaleString()}</span>
+                                <span>Total MRR: $${totalMRR.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Monthly Recurring Revenue</h3>
+                            <div class="stat-value">$${wonMRR.toLocaleString()}</div>
+                            <div class="stat-details">
+                                <span>From ${wonOpportunities.length} won opportunities</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-tasks"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Tasks</h3>
+                            <div class="stat-value">${tasks.length}</div>
+                            <div class="stat-details">
+                                <span>${activeTasks.length} active</span>
+                                <span>${completedTasks.length} completed</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>Contacts</h3>
+                            <div class="stat-value">${contacts.length}</div>
+                            <div class="stat-details">
+                                <span>${contacts.filter(c => c.is_primary).length} primary</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overview-recent-section">
+                    <h3>Recent Opportunities</h3>
+                    <div class="recent-opportunities">
+                        ${opportunities.slice(0, 5).map(opp => `
+                            <div class="recent-opportunity-item">
+                                <div class="opportunity-title">${opp.title}</div>
+                                <div class="opportunity-meta">
+                                    <span class="status-badge status-${opp.status}">${opp.status}</span>
+                                    <span class="revenue">$${opp.revenue ? opp.revenue.toLocaleString() : '0'}</span>
+                                    ${opp.mrr ? `<span class="mrr-value">MRR: $${opp.mrr.toLocaleString()}</span>` : ''}
+                                </div>
+                            </div>
+                        `).join('') || '<p>No opportunities yet</p>'}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     renderActivityItem(activity) {
@@ -1027,6 +1142,7 @@ class CRMApp {
                                     </div>
                                     <div class="revenue-info">
                                         <span class="revenue-value">$${opportunity.revenue ? opportunity.revenue.toLocaleString() : '0'}</span>
+                                        ${opportunity.mrr ? `<span class="mrr-value">MRR: $${opportunity.mrr.toLocaleString()}</span>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -4088,6 +4204,17 @@ class CRMApp {
                                 
                                 <div class="form-row">
                                     <div class="form-group">
+                                        <label for="opportunityMRR">Monthly Recurring Revenue ($)</label>
+                                        <input type="number" id="opportunityMRR" name="mrr" min="0" step="0.01" placeholder="Monthly subscription amount">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="opportunityCloseDate">Close Date</label>
+                                        <input type="date" id="opportunityCloseDate" name="close_date">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
                                         <label for="opportunityStatus">Status</label>
                                         <select id="opportunityStatus" name="status" required>
                                             <option value="new">New</option>
@@ -4174,6 +4301,7 @@ class CRMApp {
                 document.getElementById('opportunityTitle').value = opportunity.title || '';
                 document.getElementById('opportunityDescription').value = opportunity.description || '';
                 document.getElementById('opportunityRevenue').value = opportunity.revenue || '';
+                document.getElementById('opportunityMRR').value = opportunity.mrr || '';
                 document.getElementById('opportunityProbability').value = opportunity.probability || 0;
                 document.getElementById('opportunityStatus').value = opportunity.status || 'new';
                 document.getElementById('opportunityCloseDate').value = opportunity.close_date || '';
@@ -4284,6 +4412,12 @@ class CRMApp {
                                                     <span class="revenue-label">Revenue:</span>
                                                     <span class="revenue-value">$${opportunity.revenue ? opportunity.revenue.toLocaleString() : '0'}</span>
                                                 </div>
+                                                ${opportunity.mrr ? `
+                                                <div class="revenue-item">
+                                                    <span class="revenue-label">MRR:</span>
+                                                    <span class="revenue-value mrr-value">$${opportunity.mrr.toLocaleString()}</span>
+                                                </div>
+                                                ` : ''}
                                             </div>
                                         </div>
                                         
@@ -4351,6 +4485,12 @@ class CRMApp {
                                                     <label>Status:</label>
                                                     <span class="status-badge status-${opportunity.status || 'new'}">${opportunity.status || 'New'}</span>
                                                 </div>
+                                                ${opportunity.mrr ? `
+                                                <div class="info-item">
+                                                    <label>MRR:</label>
+                                                    <span class="mrr-value">$${opportunity.mrr.toLocaleString()}</span>
+                                                </div>
+                                                ` : ''}
                                             </div>
                                         </div>
                                         
@@ -4488,6 +4628,7 @@ class CRMApp {
             title: formData.get('title'),
             description: formData.get('description'),
             revenue: parseFloat(formData.get('revenue')) || 0,
+            mrr: parseFloat(formData.get('mrr')) || 0,
             probability: parseInt(formData.get('probability')) || 0,
             status: formData.get('status'),
             close_date: formData.get('close_date'),
